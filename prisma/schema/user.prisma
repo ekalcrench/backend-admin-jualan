@@ -1,0 +1,8 @@
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   @db.VarChar(255)
+  name      String   @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+}
