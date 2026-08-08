@@ -1,5 +1,5 @@
-import { Prisma } from '@/generated/prisma/client.js';
-import { PrismaService } from '@/prisma/prisma.service.js';
+import { Prisma } from '../../prisma/generated/prisma/client.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
@@ -10,11 +10,17 @@ export class UserRepository {
     return this.prisma.user.findMany();
   }
 
-  // findById(id: string) {
-  //   return this.prisma.user.findUnique({
-  //     where: { id },
-  //   });
-  // }
+  findById(id: string) {
+    return this.prisma.user.findUnique({
+      where: { id },
+    });
+  }
+
+  findByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+    });
+  }
 
   create(data: Prisma.UserCreateInput) {
     return this.prisma.user.create({
@@ -22,16 +28,16 @@ export class UserRepository {
     });
   }
 
-  // update(id: string, data: Prisma.UserUpdateInput) {
-  //   return this.prisma.user.update({
-  //     where: { id },
-  //     data,
-  //   });
-  // }
+  update(id: string, data: Prisma.UserUpdateInput) {
+    return this.prisma.user.update({
+      where: { id },
+      data,
+    });
+  }
 
-  // delete(id: string) {
-  //   return this.prisma.user.delete({
-  //     where: { id },
-  //   });
-  // }
+  delete(id: string) {
+    return this.prisma.user.delete({
+      where: { id },
+    });
+  }
 }

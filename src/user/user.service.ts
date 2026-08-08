@@ -12,7 +12,12 @@ export class UserService {
 
   async create(dto: CreateUserDto) {
     // business validation
+    const existingUser = await this.userRepository.findByEmail(dto.email);
 
-    return this.userRepository.create(dto);
+    if (existingUser) {
+      throw new Error('User already exists');
+    }
+
+    return await this.userRepository.create(dto);
   }
 }
