@@ -16,16 +16,16 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('Cats example')
-    .setDescription('The cats API description')
+    .setTitle('Backend Admin Jualan API')
+    .setDescription('CRUD API for managing users')
     .setVersion('1.0')
-    .addTag('cats')
+    .addTag('users')
     .build();
 
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, documentFactory);
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
 
   await app.listen(process.env.PORT ?? 8080);
 }
 
-bootstrap();
+void bootstrap();

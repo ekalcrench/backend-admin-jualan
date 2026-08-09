@@ -11,8 +11,14 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 export class UserService {
   constructor(private readonly userRepository: UserRepository) {}
 
-  findAll() {
-    return this.userRepository.findAll();
+  private toResponse(user: any) {
+    const { password, ...safeUser } = user;
+    return safeUser;
+  }
+
+  async findAll() {
+    const users = await this.userRepository.findAll();
+    return users.map((user) => this.toResponse(user));
   }
 
   async findByEmail(email: string) {
@@ -22,22 +28,31 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    return this.toResponse(user);
+  }
+
+  async findById(id: string) {
+    const user = await this.userRepository.findById(id);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.toResponse(user);
   }
 
   async create(dto: CreateUserDto) {
-    // business validation
     const existingUser = await this.userRepository.findByEmail(dto.email);
 
     if (existingUser) {
       throw new ConflictException('User already exists');
     }
 
-    return await this.userRepository.create(dto);
+    const user = await this.userRepository.create(dto);
+    return this.toResponse(user);
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    // business validation
     const existingUser = await this.userRepository.findById(id);
 
     if (!existingUser) {
@@ -45,14 +60,15 @@ export class UserService {
     }
 
     if (dto.email) {
-      const existingUser = await this.userRepository.findByEmail(dto.email);
+      const sameEmailUser = await this.userRepository.findByEmail(dto.email);
 
-      if (existingUser && existingUser.id !== id) {
+      if (sameEmailUser && sameEmailUser.id !== id) {
         throw new ConflictException('Email already exists');
       }
     }
 
-    return await this.userRepository.update(id, dto);
+    const user = await this.userRepository.update(id, dto);
+    return this.toResponse(user);
   }
 
   async delete(id: string) {
