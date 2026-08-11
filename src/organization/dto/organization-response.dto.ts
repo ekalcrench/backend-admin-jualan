@@ -1,13 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
 
-export class UserResponseDto extends BaseResponseDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty()
-  email!: string;
-
+export class OrganizationResponseDto extends BaseResponseDto {
   @ApiProperty()
   name!: string;
 }
