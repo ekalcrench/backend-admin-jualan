@@ -51,8 +51,6 @@ export class UserService {
 
     const hashedPassword = await argon2.hash(dto.password);
 
-    console.log('Hashed Password:', hashedPassword); // Debug
-
     const user = await this.userRepository.create({
       ...dto,
       password: hashedPassword,

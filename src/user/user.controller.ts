@@ -21,7 +21,6 @@ import { UserService } from './user.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
-import { Public } from '../auth/decorators/public.decorator.js';
 
 @ApiTags('users')
 @Controller('users')
