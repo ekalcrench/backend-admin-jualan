@@ -19,13 +19,27 @@ async function bootstrap() {
     .setTitle('Backend Admin Jualan API')
     .setDescription('CRUD API for managing users')
     .setVersion('1.0')
-    .addTag('users')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'bearer',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
+
+  document.security = [
+    {
+      bearer: [],
+    },
+  ];
+
   SwaggerModule.setup('api', app, document);
 
-  await app.listen(process.env.PORT ?? 8080);
+  await app.listen(process.env.PORT as string);
 }
 
 void bootstrap();

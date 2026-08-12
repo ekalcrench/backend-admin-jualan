@@ -6,6 +6,7 @@ import {
 import { UserRepository } from './user.repository.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import * as argon2 from 'argon2';
 
 @Injectable()
 export class UserService {
@@ -48,7 +49,15 @@ export class UserService {
       throw new ConflictException('User already exists');
     }
 
-    const user = await this.userRepository.create(dto);
+    const hashedPassword = await argon2.hash(dto.password);
+
+    console.log('Hashed Password:', hashedPassword); // Debug
+
+    const user = await this.userRepository.create({
+      ...dto,
+      password: hashedPassword,
+    });
+
     return this.toResponse(user);
   }
 
@@ -68,6 +77,7 @@ export class UserService {
     }
 
     const user = await this.userRepository.update(id, dto);
+
     return this.toResponse(user);
   }
 
