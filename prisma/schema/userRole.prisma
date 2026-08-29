@@ -1,0 +1,7 @@
+enum UserRole {
+  USER // Semua orang yang bisa akses website
+  ADMIN // Admin dari website, bukan admin organisasi
+  SUPER_ADMIN // Tingkat tertinggi dari role user
+
+  @@map("user_role")
+}

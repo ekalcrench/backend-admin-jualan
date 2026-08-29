@@ -1,9 +1,7 @@
 // Mendefinisikan status alur pendaftaran
 enum UserStatus {
   PENDING_EMAIL // Baru daftar, belum verifikasi OTP
-  PENDING_APPROVAL // Email valid, sedang menunggu persetujuan Owner
-  ACTIVE // Sudah di-approve, bisa menggunakan aplikasi
-  REJECTED // Ditolak oleh Owner
+  ACTIVE // Sudah verifikasi
   SUSPENDED // Diblokir karena alasan tertentu
 
   @@map("user_status")

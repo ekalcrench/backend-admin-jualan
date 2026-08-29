@@ -5,7 +5,6 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { randomInt } from 'crypto';
 import { UserRepository } from '../user/user.repository.js';
 import { LoginDto } from './dto/login.dto.js';
 import { JwtService } from '@nestjs/jwt';
@@ -26,10 +25,6 @@ export class AuthService {
   private toResponse(user: any) {
     const { password, ...safeUser } = user;
     return safeUser;
-  }
-
-  private generateOtpCode() {
-    return randomInt(100000, 1000000).toString();
   }
 
   async validateUser(email: string, password: string) {
@@ -105,7 +100,7 @@ export class AuthService {
     await this.emailService.verifyRegistrationCode(user.id, dto.code);
 
     const latestUser = await this.userRepository.update(user.id, {
-      status: UserStatus.PENDING_APPROVAL,
+      status: UserStatus.ACTIVE,
       emailVerifiedAt: new Date(),
     });
 

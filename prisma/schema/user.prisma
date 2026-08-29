@@ -4,24 +4,19 @@ model User {
   password String @db.VarChar(255)
   name     String @db.VarChar(255)
 
-  // --- Tahap 1: Verifikasi Email ---
+  // Verifikasi email
   emailVerifiedAt DateTime? @map("email_verified_at")
 
-  // --- Tahap 2: Verifikasi Owner ---
-  status     UserStatus @default(PENDING_EMAIL)
-  approvedAt DateTime?  @map("approved_at")
-
-  // Menyimpan ID owner yang memberikan approval
-  // Relasi self-referencing ke tabel User ini sendiri
-  approvedById String? @map("approved_by_id") @db.Uuid
+  status UserStatus @default(PENDING_EMAIL)
+  role   UserRole   @default(USER)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  memberships        OrganizationUser[]
-  emailVerifications EmailVerification[]
-  approvedBy         User?               @relation("UserApprovals", fields: [approvedById], references: [id])
-  approvedUsers      User[]              @relation("UserApprovals")
+  memberships           OrganizationUser[]  @relation("User")
+  emailVerifications    EmailVerification[]
+  organizationApprovals OrganizationUser[]  @relation("UserApprovals")
+  organizationUpdates   OrganizationUser[]  @relation("UserUpdates")
 
   @@map("users")
 }

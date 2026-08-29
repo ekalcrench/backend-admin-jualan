@@ -3,13 +3,21 @@ model OrganizationUser {
   userId         String @map("user_id") @db.Uuid
   organizationId String @map("organization_id") @db.Uuid
 
-  role OrganizationRole
+  role   OrganizationRole
+  status OrganizationUserStatus @default(PENDING_APPROVAL)
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  // Verifikasi owner
+  approvedAt   DateTime? @map("approved_at")
+  approvedById String?   @map("approved_by_id") @db.Uuid
 
-  user         User         @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedById String?  @map("updated_by_id") @db.Uuid
+
+  user         User         @relation("User", fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
+  approvedBy   User?        @relation("UserApprovals", fields: [approvedById], references: [id])
+  updatedBy    User?        @relation("UserUpdates", fields: [updatedById], references: [id])
 
   @@unique([userId, organizationId])
   @@map("organization_users")

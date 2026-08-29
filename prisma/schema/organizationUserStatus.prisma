@@ -1,0 +1,9 @@
+// Mendefinisikan status organization_users
+enum OrganizationUserStatus {
+  PENDING_APPROVAL // Email valid, sedang menunggu persetujuan Owner
+  APPROVED // Sudah di-approve, bisa masuk ke organisasi menggunakan aplikasi
+  REJECTED // Ditolak oleh Owner
+  SUSPENDED // Diblokir karena alasan tertentu
+
+  @@map("organization_user_status")
+}
