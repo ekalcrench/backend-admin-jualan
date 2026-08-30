@@ -20,13 +20,19 @@ export class EmailVerificationRepository {
   create(data: Prisma.EmailVerificationUncheckedCreateInput) {
     return this.prisma.emailVerification.create({
       data: {
+        userId: data.userId,
         otpHash: data.otpHash,
         expiresAt: data.expiresAt,
         attempts: data.attempts,
-        user: {
-          connect: { id: data.userId },
-        },
+        lastSentAt: data.lastSentAt,
       },
+    });
+  }
+
+  update(data: Prisma.EmailVerificationUncheckedCreateInput) {
+    return this.prisma.emailVerification.update({
+      where: { userId: data.userId },
+      data,
     });
   }
 

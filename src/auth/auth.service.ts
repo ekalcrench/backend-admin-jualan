@@ -13,6 +13,8 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 import { UserStatus } from '../common/enum/user-status.enum.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { EmailService } from '../email/email.service.js';
+import { UserService } from '../user/user.service.js';
+import { ResendOtpDto } from './dto/resend-otp.dto.js';
 
 @Injectable()
 export class AuthService {
@@ -20,6 +22,7 @@ export class AuthService {
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    private readonly userService: UserService,
   ) {}
 
   private toResponse(user: any) {
@@ -27,7 +30,7 @@ export class AuthService {
     return safeUser;
   }
 
-  async validateUser(email: string, password: string) {
+  async validateUserPassword(email: string, password: string) {
     const user = await this.userRepository.findByEmail(email);
 
     if (!user) return null;
@@ -40,7 +43,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.validateUser(dto.email, dto.password);
+    const user = await this.validateUserPassword(dto.email, dto.password);
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -54,7 +57,7 @@ export class AuthService {
     return { user, token };
   }
 
-  async create(dto: CreateUserDto) {
+  async register(dto: CreateUserDto) {
     const existingUser = await this.userRepository.findByEmail(dto.email);
 
     if (existingUser) {
@@ -86,16 +89,18 @@ export class AuthService {
     return this.toResponse(user);
   }
 
-  async verifyRegistration(dto: VerifyEmailDto) {
-    const user = await this.userRepository.findByEmail(dto.email);
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+  async verifyRegistrationCheck(email: string) {
+    const user = await this.userService.findByEmail(email);
 
     if (user.status !== UserStatus.PENDING_EMAIL.toString()) {
       throw new BadRequestException('Email verification is not allowed');
     }
+
+    return this.toResponse(user);
+  }
+
+  async verifyRegistration(dto: VerifyEmailDto) {
+    const user = await this.verifyRegistrationCheck(dto.email);
 
     await this.emailService.verifyRegistrationCode(user.id, dto.code);
 
@@ -105,5 +110,13 @@ export class AuthService {
     });
 
     return this.toResponse(latestUser);
+  }
+
+  async resendOtp(dto: ResendOtpDto) {
+    const user = await this.verifyRegistrationCheck(dto.email);
+
+    await this.emailService.resendOtp({ email: user.email, userId: user.id });
+
+    return true;
   }
 }

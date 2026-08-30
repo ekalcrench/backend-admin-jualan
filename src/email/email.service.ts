@@ -56,6 +56,25 @@ export class EmailService {
       otpHash,
       userId: dto.userId,
       attempts: 0,
+      lastSentAt: new Date(),
+    });
+
+    return emailVerification;
+  }
+
+  async resendOtp(dto: CreateEmailVerificationDto) {
+    const otpCode = this.generateOtpCode();
+    const otpHash = await argon2.hash(otpCode);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 Menit
+
+    await this.sendOtpCodeToEmail(dto.email, otpCode);
+
+    const emailVerification = await this.emailVerificationRepository.update({
+      expiresAt,
+      otpHash,
+      userId: dto.userId,
+      attempts: 0,
+      lastSentAt: new Date(Date.now()),
     });
 
     return emailVerification;

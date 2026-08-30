@@ -6,11 +6,13 @@ model EmailVerification {
 
   attempts Int @default(1) @db.SmallInt
 
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  lastSentAt DateTime @map("last_sent_at")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id])
 
+  @@unique([userId])
   @@map("email_verifications")
 }
