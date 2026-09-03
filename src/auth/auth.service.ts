@@ -15,6 +15,7 @@ import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { EmailService } from '../email/email.service.js';
 import { UserService } from '../user/user.service.js';
 import { ResendOtpDto } from './dto/resend-otp.dto.js';
+import { UserResponseDto } from '../user/dto/user-response.dto.js';
 
 @Injectable()
 export class AuthService {
@@ -25,28 +26,31 @@ export class AuthService {
     private readonly userService: UserService,
   ) {}
 
-  private toResponse(user: any) {
+  private toResponse(user: any): UserResponseDto {
     const { password, ...safeUser } = user;
     return safeUser;
   }
 
-  async validateUserPassword(email: string, password: string) {
-    const user = await this.userRepository.findByEmail(email);
+  async validateUserPassword(userPassword: string, password: string) {
+    const isValid = await argon2.verify(userPassword, password);
 
-    if (!user) return null;
-
-    const isValid = await argon2.verify(user.password, password);
-
-    if (!isValid) return null;
-
-    return this.toResponse(user);
+    return isValid;
   }
 
   async login(dto: LoginDto) {
-    const user = await this.validateUserPassword(dto.email, dto.password);
+    const user = await this.userRepository.findByEmail(dto.email);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new NotFoundException('Email belum terdaftar');
+    }
+
+    const isValid = await this.validateUserPassword(
+      user.password,
+      dto.password,
+    );
+
+    if (!isValid) {
+      throw new UnauthorizedException('Password tidak valid');
     }
 
     const token = await this.jwtService.signAsync({
@@ -62,10 +66,7 @@ export class AuthService {
 
     if (existingUser) {
       if (existingUser.status === UserStatus.PENDING_EMAIL.toString()) {
-        await this.emailService.createEmailVerification({
-          userId: existingUser.id,
-          email: existingUser.email,
-        });
+        await this.resendOtp({ email: dto.email });
 
         return this.toResponse(existingUser);
       }

@@ -16,6 +16,7 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 import { CreateUserResponseDto } from './dto/create-user-response.dto.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { ResendOtpDto } from './dto/resend-otp.dto.js';
+import { LoginResponseDto } from './dto/login-response.dto.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -26,8 +27,10 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'Login and receive JWT in Authorization header' })
   @ApiCreatedResponse({
-    description: 'Returns user profile and sets Authorization header',
+    description: 'Returns user profile and access token',
+    type: LoginResponseDto,
   })
+  @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
   async login(@Body() dto: LoginDto) {
     const { user, token } = await this.authService.login(dto);
