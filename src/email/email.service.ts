@@ -2,13 +2,14 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { EmailVerificationRepository } from './email-verification.repository.js';
 import { CreateEmailVerificationDto } from './dto/create-email-verification.dto.js';
 import { randomInt } from 'crypto';
 import { Resend } from 'resend';
+import { RESEND_DELAY } from '../common/constants/otp.constants.js';
+import { OTP_EXPIRATION_TIME } from '../common/constants/expired.constants.js';
 
 @Injectable()
 export class EmailService {
@@ -44,10 +45,27 @@ export class EmailService {
     });
   }
 
+  async getNewOtpValidResendTime(userId: string) {
+    const verification =
+      await this.emailVerificationRepository.findLatestByUserId(userId);
+
+    if (!verification) {
+      throw new BadRequestException(
+        'Kode OTP tidak ditemukan, silakan minta OTP baru',
+      );
+    }
+
+    const otpValidResendTime = new Date(
+      verification.lastSentAt.getTime() + RESEND_DELAY,
+    );
+
+    return otpValidResendTime;
+  }
+
   async createEmailVerification(dto: CreateEmailVerificationDto) {
     const otpCode = this.generateOtpCode();
     const otpHash = await argon2.hash(otpCode);
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 Menit
+    const expiresAt = new Date(Date.now() + OTP_EXPIRATION_TIME);
 
     await this.sendOtpCodeToEmail(dto.email, otpCode);
 
@@ -85,16 +103,21 @@ export class EmailService {
       await this.emailVerificationRepository.findLatestByUserId(userId);
 
     if (!verification) {
-      throw new BadRequestException('No verification code found for this user');
+      throw new BadRequestException(
+        'Kode OTP tidak ditemukan, silakan minta OTP baru',
+      );
     }
 
     if (verification.expiresAt < new Date()) {
-      throw new BadRequestException('OTP Code has expired');
+      throw new BadRequestException(
+        'Kode OTP sudah kadaluarsa, silakan minta OTP baru',
+      );
     }
 
-    // Maksimum attempts = 5
     if (verification.attempts > 5) {
-      throw new BadRequestException('Too many invalid attempts');
+      throw new BadRequestException(
+        'Terlalu banyak percobaan, silakan minta OTP baru',
+      );
     }
 
     const isValidCode = await argon2.verify(verification.otpHash, code);
@@ -102,7 +125,7 @@ export class EmailService {
     if (!isValidCode) {
       await this.emailVerificationRepository.incrementAttempts(verification.id);
 
-      throw new BadRequestException('Invalid OTP Code');
+      throw new BadRequestException('Kode OTP tidak valid');
     }
   }
 }

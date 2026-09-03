@@ -27,11 +27,12 @@ export class AuthService {
   ) {}
 
   private toResponse(user: any): UserResponseDto {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...safeUser } = user;
     return safeUser;
   }
 
-  async validateUserPassword(userPassword: string, password: string) {
+  private async validateUserPassword(userPassword: string, password: string) {
     const isValid = await argon2.verify(userPassword, password);
 
     return isValid;
@@ -71,7 +72,7 @@ export class AuthService {
         return this.toResponse(existingUser);
       }
 
-      throw new ConflictException('User already exists');
+      throw new ConflictException('Email sudah terdaftar');
     }
 
     const hashedPassword = await argon2.hash(dto.password);
@@ -93,15 +94,23 @@ export class AuthService {
   async verifyRegistrationCheck(email: string) {
     const user = await this.userService.findByEmail(email);
 
-    if (user.status !== UserStatus.PENDING_EMAIL.toString()) {
-      throw new BadRequestException('Email verification is not allowed');
+    if (!user) {
+      throw new NotFoundException('Email belum terdaftar');
     }
 
-    return this.toResponse(user);
+    if (user.status !== UserStatus.PENDING_EMAIL.toString()) {
+      throw new BadRequestException('Email sudah terdaftar');
+    }
+
+    const otpValidResendTime = await this.emailService.getNewOtpValidResendTime(
+      user.id,
+    );
+
+    return { user: this.toResponse(user), otpValidResendTime };
   }
 
   async verifyRegistration(dto: VerifyEmailDto) {
-    const user = await this.verifyRegistrationCheck(dto.email);
+    const { user } = await this.verifyRegistrationCheck(dto.email);
 
     await this.emailService.verifyRegistrationCode(user.id, dto.code);
 
@@ -114,10 +123,18 @@ export class AuthService {
   }
 
   async resendOtp(dto: ResendOtpDto) {
-    const user = await this.verifyRegistrationCheck(dto.email);
+    const { user, otpValidResendTime } = await this.verifyRegistrationCheck(
+      dto.email,
+    );
+
+    const canResend = Date.now() >= otpValidResendTime.getTime();
+
+    if (!canResend) {
+      throw new BadRequestException('Resend OTP is not allowed yet');
+    }
 
     await this.emailService.resendOtp({ email: user.email, userId: user.id });
 
-    return true;
+    return { user, otpValidResendTime };
   }
 }

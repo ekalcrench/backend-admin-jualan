@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -17,6 +17,7 @@ import { CreateUserResponseDto } from './dto/create-user-response.dto.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { ResendOtpDto } from './dto/resend-otp.dto.js';
 import { LoginResponseDto } from './dto/login-response.dto.js';
+import { ResendOtpResponseDto } from './dto/resend-otp-response.dto.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -25,13 +26,13 @@ export class AuthController {
 
   @Public()
   @Post('login')
-  @ApiOperation({ summary: 'Login and receive JWT in Authorization header' })
+  @ApiOperation({ summary: 'Login and receive access token' })
   @ApiCreatedResponse({
     description: 'Returns user profile and access token',
     type: LoginResponseDto,
   })
-  @ApiNotFoundResponse({ description: 'User not found' })
-  @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
+  @ApiNotFoundResponse({ description: 'Email belum terdaftar' })
+  @ApiUnauthorizedResponse({ description: 'Password tidak valid' })
   async login(@Body() dto: LoginDto) {
     const { user, token } = await this.authService.login(dto);
 
@@ -45,7 +46,7 @@ export class AuthController {
     description: 'Returns user profile',
     type: CreateUserResponseDto,
   })
-  @ApiConflictResponse({ description: 'User with this email already exists' })
+  @ApiConflictResponse({ description: 'Email sudah terdaftar' })
   async register(@Body() dto: CreateUserDto) {
     const user = await this.authService.register(dto);
 
@@ -54,17 +55,14 @@ export class AuthController {
 
   @Public()
   @Get('register/verify')
-  @ApiOperation({ summary: 'Get if email is verified for registration OTP' })
+  @ApiOperation({ summary: 'Get if email is verified for verification' })
   @ApiOkResponse({
     description: 'Returns user profile',
-    type: CreateUserResponseDto,
+    type: ResendOtpResponseDto,
   })
-  @ApiBadRequestResponse({
-    description: 'Email verification is not allowed',
-  })
-  @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiBadRequestResponse({ description: 'Email sudah terdaftar' })
+  @ApiNotFoundResponse({ description: 'Email belum terdaftar' })
   async registerVerifyCheck(@Query('email') email: string) {
-    console.log('>>> email : ', email);
     return this.authService.verifyRegistrationCheck(email);
   }
 
@@ -87,10 +85,10 @@ export class AuthController {
   @Post('resend-otp')
   @ApiOperation({ summary: 'Resend OTP Code' })
   @ApiCreatedResponse({
-    description: 'Return boolean',
-    type: Boolean,
+    description: 'Return resend OTP response',
+    type: ResendOtpResponseDto,
   })
-  // @ApiConflictResponse({ description: 'User with this email already exists' })
+  @ApiBadRequestResponse({ description: 'Resend OTP is not allowed yet' })
   async resendOtp(@Body() dto: ResendOtpDto) {
     const response = await this.authService.resendOtp(dto);
 
