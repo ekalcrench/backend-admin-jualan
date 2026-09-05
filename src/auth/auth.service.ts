@@ -98,7 +98,7 @@ export class AuthService {
       throw new NotFoundException('Email belum terdaftar');
     }
 
-    if (user.status !== UserStatus.PENDING_EMAIL.toString()) {
+    if (user.status !== UserStatus.PENDING_EMAIL) {
       throw new BadRequestException('Email sudah terdaftar');
     }
 

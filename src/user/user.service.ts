@@ -7,12 +7,14 @@ import { UserRepository } from './user.repository.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as argon2 from 'argon2';
+import { UserResponseDto } from './dto/user-response.dto.js';
 
 @Injectable()
 export class UserService {
   constructor(private readonly userRepository: UserRepository) {}
 
-  private toResponse(user: any) {
+  private toResponse(user: any): UserResponseDto {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...safeUser } = user;
     return safeUser;
   }
