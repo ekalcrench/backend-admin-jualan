@@ -1,5 +1,5 @@
 model InventoryLot {
-  id              String @id @default(uuid())
+  id              String @id @default(uuid()) @db.Uuid
   inventoryItemId String @map("inventory_item_id") @db.Uuid
   purchaseItemId  String @map("purchase_item_id") @db.Uuid
 
