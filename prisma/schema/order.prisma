@@ -1,0 +1,16 @@
+model Order {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  totalAmount Decimal @map("total_amount") @db.Decimal(15, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  organization Organization @relation(fields: [organizationId], references: [id])
+  items        OrderItem[]
+
+  @@index([organizationId, createdAt])
+  @@map("orders")
+}

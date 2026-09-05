@@ -1,0 +1,14 @@
+model ProductIngredient {
+  id              String @id @default(uuid()) @db.Uuid
+  productId       String @map("product_id") @db.Uuid
+  inventoryItemId String @map("inventory_item_id") @db.Uuid
+
+  quantity Decimal @db.Decimal(15, 2)
+
+  // Relationships
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@unique([productId, inventoryItemId])
+  @@map("product_ingredients")
+}

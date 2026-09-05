@@ -1,0 +1,7 @@
+enum InventoryUnit {
+  GRAM
+  ML
+  PCS
+
+  @@map("inventory_unit")
+}

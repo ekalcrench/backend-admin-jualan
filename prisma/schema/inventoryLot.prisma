@@ -1,0 +1,22 @@
+model InventoryLot {
+  id              String @id @default(uuid())
+  inventoryItemId String @map("inventory_item_id") @db.Uuid
+  purchaseItemId  String @map("purchase_item_id") @db.Uuid
+
+  quantity          Decimal @db.Decimal(15, 2)
+  remainingQuantity Decimal @map("remaining_quantity") @db.Decimal(15, 2)
+  unitCost          Decimal @map("unit_cost") @db.Decimal(15, 3)
+
+  receivedAt DateTime  @map("received_at")
+  expiredAt  DateTime? @map("expired_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  inventoryItem         InventoryItem          @relation(fields: [inventoryItemId], references: [id])
+  inventoryConsumptions InventoryConsumption[]
+  purchaseItem          PurchaseItem           @relation(fields: [purchaseItemId], references: [id])
+
+  @@index([inventoryItemId, receivedAt])
+  @@map("inventory_lots")
+}

@@ -14,6 +14,7 @@ model OrganizationUser {
   updatedAt   DateTime @updatedAt @map("updated_at")
   updatedById String?  @map("updated_by_id") @db.Uuid
 
+  // Relationships
   user         User         @relation("User", fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
   approvedBy   User?        @relation("UserApprovals", fields: [approvedById], references: [id])

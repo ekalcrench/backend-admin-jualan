@@ -1,0 +1,18 @@
+model Purchase {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  supplierName  String?  @map("supplier_name")
+  invoiceNumber String?  @map("invoice_number")
+  purchasedAt   DateTime @map("purchased_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  purchaseItems PurchaseItem[]
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, supplierName, invoiceNumber])
+  @@map("purchase")
+}

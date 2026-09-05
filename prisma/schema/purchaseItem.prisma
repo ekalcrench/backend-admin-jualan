@@ -1,0 +1,20 @@
+model PurchaseItem {
+  id              String @id @default(uuid()) @db.Uuid
+  purchaseId      String @map("purchase_id") @db.Uuid
+  inventoryItemId String @map("inventory_item_id") @db.Uuid
+
+  quantity Decimal @db.Decimal(15, 2)
+  unitCost Decimal @map("unit_cost") @db.Decimal(15, 3)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  purchase      Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem  @relation(fields: [inventoryItemId], references: [id])
+  inventoryLots InventoryLot[]
+
+  @@index([purchaseId])
+  @@index([inventoryItemId])
+  @@map("purchase_item")
+}

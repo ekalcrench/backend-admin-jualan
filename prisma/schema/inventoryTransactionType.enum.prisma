@@ -1,0 +1,10 @@
+enum InventoryTransactionType {
+  PURCHASE
+  SALE
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  WASTE
+  RETURN
+
+  @@map("inventory_transaction_type")
+}
