@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -53,11 +54,27 @@ export class OrganizationController {
   }
 
   @Post()
+  @Roles(UserRole.SUPER_ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Create a new organization' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'Azmi Company' },
+        file: { type: 'string', format: 'binary' },
+      },
+      required: ['name', 'file'],
+    },
+  })
   @ApiCreatedResponse({ type: OrganizationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
-  create(@Body() dto: CreateOrganizationDto) {
-    return this.organizationService.create(dto);
+  create(
+    @Body() dto: CreateOrganizationDto,
+    @UploadedFile(new FileImageValidationPipe()) file: FileUpload,
+  ) {
+    return this.organizationService.create(dto, file);
   }
 
   @Patch(':id')
@@ -77,9 +94,9 @@ export class OrganizationController {
     return this.organizationService.delete(id);
   }
 
-  @Post(':organizationId/logo')
+  @Put(':organizationId/logo')
   @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({ summary: 'Upload an organization logo' })
+  @ApiOperation({ summary: 'Change an organization logo' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {

@@ -3,7 +3,8 @@ import { OrganizationRepository } from './organization.repository.js';
 import { CreateOrganizationDto } from './dto/create-organization.dto.js';
 import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { extname, join } from 'path';
+import { randomUUID } from 'crypto';
 import { FileUpload } from '../common/types/file-upload.types.js';
 
 @Injectable()
@@ -27,9 +28,34 @@ export class OrganizationService {
     return org;
   }
 
-  async create(dto: CreateOrganizationDto) {
-    const org = await this.organizationRepository.create(dto);
-    return org;
+  async create(dto: CreateOrganizationDto, file: FileUpload) {
+    const organizationId = randomUUID();
+    const uploadDirectory = join(
+      process.cwd(),
+      'uploads',
+      'organizations',
+      organizationId,
+    );
+    const fileName = file.originalname;
+    const filePath = join(uploadDirectory, fileName);
+    const logoUrl = `/uploads/organizations/${organizationId}/${fileName}`;
+
+    mkdirSync(uploadDirectory, { recursive: true });
+    writeFileSync(filePath, file.buffer);
+
+    try {
+      return await this.organizationRepository.create({
+        id: organizationId,
+        name: dto.name,
+        logoUrl,
+      });
+    } catch (error) {
+      if (existsSync(filePath)) {
+        unlinkSync(filePath);
+      }
+
+      throw error;
+    }
   }
 
   async update(id: string, dto: UpdateOrganizationDto) {
