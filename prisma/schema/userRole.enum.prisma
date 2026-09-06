@@ -1,7 +1,26 @@
 enum UserRole {
-  USER // Semua orang yang bisa akses website
-  ADMIN // Admin dari website, bukan admin organisasi
-  SUPER_ADMIN // Tingkat tertinggi dari role user
+  /**
+   * Semua orang yang bisa akses website
+   * Hak:
+   * 1. Melihat halaman /dashboard
+   */
+  USER
+
+  /**
+   * Admin dari website, bukan admin organisasi
+   * Hak:
+   * 1. Melihat halaman /users
+   * 2. Bisa create, read, dan update
+   */
+  ADMIN
+
+  /**
+   * Super Admin dari website
+   * Hak:
+   * 1. Memiliki hak akses semua halaman
+   * 2. Bisa create, read, update, dan delete
+   */
+  SUPER_ADMIN
 
   @@map("user_role")
 }

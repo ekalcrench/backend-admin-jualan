@@ -6,21 +6,29 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
-  ApiConflictResponse,
 } from '@nestjs/swagger';
 import { OrganizationService } from './organization.service.js';
 import { CreateOrganizationDto } from './dto/create-organization.dto.js';
 import { OrganizationResponseDto } from './dto/organization-response.dto.js';
 import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
+import { Roles } from '../auth/decorators/rolse.decorator.js';
+import { UserRole } from '../common/enums/user-role.enum.js';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { FileUpload } from '../common/types/file-upload.types.js';
+import { FileImageValidationPipe } from '../common/pipes/file-image-validation.pipe.js';
 
 @ApiTags('organizations')
 @Controller('organizations')
@@ -28,6 +36,7 @@ export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}
 
   @Get()
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Retrieve all organizations' })
   @ApiOkResponse({ type: [OrganizationResponseDto] })
   findAll() {
@@ -66,5 +75,26 @@ export class OrganizationController {
   @ApiNotFoundResponse({ description: 'Organization not found' })
   delete(@Param('id') id: string) {
     return this.organizationService.delete(id);
+  }
+
+  @Post(':organizationId/logo')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload an organization logo' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiBadRequestResponse({ description: 'An image file is required' })
+  uploadLogo(
+    @Param('organizationId') organizationId: string,
+    @UploadedFile(new FileImageValidationPipe()) file: FileUpload,
+  ) {
+    return this.organizationService.uploadLogo(organizationId, file);
   }
 }

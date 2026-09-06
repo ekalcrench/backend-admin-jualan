@@ -10,7 +10,7 @@ import { LoginDto } from './dto/login.dto.js';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { CreateUserDto } from './dto/create-user.dto.js';
-import { UserStatus } from '../common/enum/user-status.enum.js';
+import { UserStatus } from '../common/enums/user-status.enum.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { EmailService } from '../email/email.service.js';
 import { UserService } from '../user/user.service.js';
@@ -57,6 +57,7 @@ export class AuthService {
     const token = await this.jwtService.signAsync({
       sub: user.id,
       name: user.email,
+      roles: [user.role],
     });
 
     return { user, token };

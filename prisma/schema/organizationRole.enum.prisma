@@ -1,7 +1,0 @@
-enum OrganizationRole {
-  OWNER
-  ADMIN
-  MEMBER
-
-  @@map("organization_role")
-}

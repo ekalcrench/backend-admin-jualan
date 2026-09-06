@@ -1,0 +1,25 @@
+enum OrganizationUserRole {
+  /**
+   * Semua orang yang bisa akses website
+   * Hak:
+   * 1. Melihat halaman /dashboard
+   */
+  MEMBER
+
+  /**
+   * Semua orang yang bisa akses website
+   * Hak:
+   * 1. Melihat halaman /dashboard
+   */
+  ADMIN
+
+  /**
+   * Owner dari organization
+   * Hak:
+   * 1. Memiliki hak akses semua halaman based on organizationId
+   * 2. Bisa create, read, update, dan delete based on organizationId
+   */
+  OWNER
+
+  @@map("organization_role")
+}

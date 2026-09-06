@@ -7,6 +7,7 @@ import { UserModule } from '../user/user.module.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { JwtModule } from '@nestjs/jwt';
 import { EmailModule } from '../email/email.module.js';
+import { RolesGuard } from './guards/role.guard.js';
 
 @Module({
   imports: [
@@ -20,7 +21,11 @@ import { EmailModule } from '../email/email.module.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, { provide: APP_GUARD, useClass: JwtAuthGuard }],
+  providers: [
+    AuthService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

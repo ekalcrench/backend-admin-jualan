@@ -21,6 +21,8 @@ import { UserService } from './user.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
+import { Roles } from '../auth/decorators/rolse.decorator.js';
+import { UserRole } from '../common/enums/user-role.enum.js';
 
 @ApiTags('users')
 @Controller('users')
@@ -28,6 +30,7 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Retrieve all users' })
   @ApiOkResponse({ type: [UserResponseDto] })
   findAll() {

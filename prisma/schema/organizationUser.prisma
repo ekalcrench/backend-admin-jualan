@@ -3,7 +3,7 @@ model OrganizationUser {
   userId         String @map("user_id") @db.Uuid
   organizationId String @map("organization_id") @db.Uuid
 
-  role   OrganizationRole
+  role   OrganizationUserRole
   status OrganizationUserStatus @default(PENDING_APPROVAL)
 
   // Verifikasi owner
