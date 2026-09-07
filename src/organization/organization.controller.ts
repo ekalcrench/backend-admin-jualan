@@ -63,9 +63,12 @@ export class OrganizationController {
       type: 'object',
       properties: {
         name: { type: 'string', example: 'Azmi Company' },
+        address: { type: 'string', example: 'Jl. Pegangsangan Timur No. 12' },
+        email: { type: 'email', example: 'user@example.com' },
+        phone: { type: 'string', example: '08976573345' },
         file: { type: 'string', format: 'binary' },
       },
-      required: ['name', 'file'],
+      required: ['name', 'address', 'email', 'phone', 'file'],
     },
   })
   @ApiCreatedResponse({ type: OrganizationResponseDto })

@@ -45,8 +45,8 @@ export class OrganizationService {
 
     try {
       return await this.organizationRepository.create({
+        ...dto,
         id: organizationId,
-        name: dto.name,
         logoUrl,
       });
     } catch (error) {
