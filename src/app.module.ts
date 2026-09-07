@@ -13,7 +13,8 @@ import { AuthModule } from './auth/auth.module.js';
     OrganizationModule,
     AuthModule,
     ServeStaticModule.forRoot({
-      rootPath: join(import.meta.dirname, '..', 'client'),
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
     }),
   ],
 })
