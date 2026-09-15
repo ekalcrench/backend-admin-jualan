@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -30,6 +31,8 @@ import { UserRole } from '../common/enums/user-role.enum.js';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { FileUpload } from '../common/types/file-upload.types.js';
 import { FileImageValidationPipe } from '../common/pipes/file-image-validation.pipe.js';
+import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 
 @ApiTags('organizations')
 @Controller('organizations')
@@ -38,10 +41,11 @@ export class OrganizationController {
 
   @Get()
   @Roles(UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Retrieve all organizations' })
-  @ApiOkResponse({ type: [OrganizationResponseDto] })
-  findAll() {
-    return this.organizationService.findAll();
+  @ApiOperation({ summary: 'Retrieve organizations by pages' })
+  @ApiOkResponse({ type: GetByPagesResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid request payload' })
+  findByPages(@Query() query: GetByPagesDto) {
+    return this.organizationService.findByPages(query);
   }
 
   @Get(':id')

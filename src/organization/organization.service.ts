@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
 import { FileUpload } from '../common/types/file-upload.types.js';
+import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 
 @Injectable()
 export class OrganizationService {
@@ -16,6 +17,20 @@ export class OrganizationService {
   async findAll() {
     const orgs = await this.organizationRepository.findAll();
     return orgs.map((org) => org);
+  }
+
+  async findByPages(dto: GetByPagesDto) {
+    const { items, total } = await this.organizationRepository.findByPages(dto);
+
+    return {
+      items,
+      pagination: {
+        page: dto.page,
+        size: dto.size,
+        total,
+        totalPages: Math.ceil(total / dto.size),
+      },
+    };
   }
 
   async findById(id: string) {
