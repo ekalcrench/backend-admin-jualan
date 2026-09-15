@@ -6,10 +6,5 @@ export class GetByPagesDto extends PaginationDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  name?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  email?: string;
+  search?: string;
 }

@@ -13,24 +13,33 @@ export class OrganizationRepository {
   }
 
   async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, name, email } = data;
+    const { page, size, sortBy, search } = data;
 
     const skip = (page - 1) * size;
 
-    const where: Prisma.OrganizationWhereInput = {
-      ...(name && {
-        name: {
-          contains: name,
-          mode: 'insensitive',
-        },
-      }),
-      ...(email && {
-        email: {
-          contains: email,
-          mode: 'insensitive',
-        },
-      }),
-    };
+    const where: Prisma.OrganizationWhereInput = search
+      ? {
+          OR: [
+            {
+              name: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
+              email: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
+              phone: {
+                contains: search,
+              },
+            },
+          ],
+        }
+      : {};
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.organization.findMany({
