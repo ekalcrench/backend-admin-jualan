@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsUUID } from 'class-validator';
+import { emailExample } from '../../common/constants/api-value-example.constants.js';
 
 export class CreateEmailVerificationDto {
   @ApiProperty({ format: 'uuid' })
@@ -7,7 +8,7 @@ export class CreateEmailVerificationDto {
   @IsNotEmpty()
   userId!: string;
 
-  @ApiProperty({ example: 'user@example.com' })
+  @ApiProperty({ example: emailExample })
   @IsEmail()
   @IsNotEmpty()
   email!: string;

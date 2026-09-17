@@ -4,9 +4,15 @@ import { extname } from 'path';
 
 @Injectable()
 export class FileImageValidationPipe implements PipeTransform {
-  transform(value: FileUpload) {
+  constructor(private readonly required = true) {}
+
+  transform(value: FileUpload | undefined) {
     if (!value) {
-      throw new BadRequestException('File is required');
+      if (this.required) {
+        throw new BadRequestException('File is required');
+      }
+
+      return value;
     }
 
     const maxSize = 1 * 1024 * 1024; // 1 MB

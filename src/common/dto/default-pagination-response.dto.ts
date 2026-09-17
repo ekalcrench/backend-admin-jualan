@@ -1,15 +1,21 @@
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  pageExample,
+  pageSizeExample,
+  totalDataExample,
+  totalPageExample,
+} from '../constants/api-value-example.constants.js';
 
 export class DefaultPaginationResponseDto {
-  @ApiProperty({ example: 1 })
+  @ApiProperty({ example: pageExample })
   page!: number;
 
-  @ApiProperty({ example: 20 })
+  @ApiProperty({ example: pageSizeExample })
   size!: number;
 
-  @ApiProperty({ example: 125 })
+  @ApiProperty({ example: totalDataExample })
   total!: number;
 
-  @ApiProperty({ example: 7 })
+  @ApiProperty({ example: totalPageExample })
   totalPages!: number;
 }

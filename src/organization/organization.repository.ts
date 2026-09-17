@@ -8,10 +8,6 @@ import { FindByPagesParams } from './types/find-by-pages-params.types.js';
 export class OrganizationRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll() {
-    return this.prisma.organization.findMany();
-  }
-
   async findByPages(data: FindByPagesParams) {
     const { page, size, sortBy, search } = data;
 

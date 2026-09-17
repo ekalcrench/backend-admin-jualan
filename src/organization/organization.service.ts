@@ -3,7 +3,7 @@ import { OrganizationRepository } from './organization.repository.js';
 import { CreateOrganizationDto } from './dto/create-organization.dto.js';
 import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
-import { extname, join } from 'path';
+import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { FileUpload } from '../common/types/file-upload.types.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
@@ -13,11 +13,6 @@ export class OrganizationService {
   constructor(
     private readonly organizationRepository: OrganizationRepository,
   ) {}
-
-  async findAll() {
-    const orgs = await this.organizationRepository.findAll();
-    return orgs.map((org) => org);
-  }
 
   async findByPages(dto: GetByPagesDto) {
     const { items, total } = await this.organizationRepository.findByPages(dto);
@@ -73,15 +68,54 @@ export class OrganizationService {
     }
   }
 
-  async update(id: string, dto: UpdateOrganizationDto) {
+  async update(id: string, dto: UpdateOrganizationDto, file?: FileUpload) {
     const existing = await this.organizationRepository.findById(id);
 
     if (!existing) {
       throw new NotFoundException('Organization not found');
     }
 
-    const org = await this.organizationRepository.update(id, dto);
-    return org;
+    let filePath: string | undefined;
+    let logoUrl: string | undefined;
+
+    if (file) {
+      const uploadDirectory = join(
+        process.cwd(),
+        'uploads',
+        'organizations',
+        id,
+      );
+      const fileName = file.originalname;
+      filePath = join(uploadDirectory, fileName);
+      logoUrl = `/uploads/organizations/${id}/${fileName}`;
+
+      mkdirSync(uploadDirectory, { recursive: true });
+      writeFileSync(filePath, file.buffer);
+    }
+
+    try {
+      const org = await this.organizationRepository.update(id, {
+        ...dto,
+        ...(logoUrl && { logoUrl }),
+      });
+
+      // DB berhasil → hapus logo lama
+      if (file && existing.logoUrl) {
+        const oldFilePath = join(process.cwd(), existing.logoUrl);
+
+        if (existsSync(oldFilePath)) {
+          unlinkSync(oldFilePath);
+        }
+      }
+
+      return org;
+    } catch (error) {
+      if (filePath && existsSync(filePath)) {
+        unlinkSync(filePath);
+      }
+
+      throw error;
+    }
   }
 
   async delete(id: string) {
@@ -93,66 +127,6 @@ export class OrganizationService {
 
     await this.organizationRepository.delete(id);
 
-    return { message: 'Organization deleted successfully' };
-  }
-
-  async uploadLogo(organizationId: string, file: FileUpload) {
-    // 1. Pastikan organization ada
-    const organization =
-      await this.organizationRepository.findById(organizationId);
-
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
-    }
-
-    // 2. Buat directory
-    const uploadDirectory = join(
-      process.cwd(),
-      'uploads',
-      'organizations',
-      organizationId,
-    );
-
-    if (!existsSync(uploadDirectory)) {
-      mkdirSync(uploadDirectory, {
-        recursive: true,
-      });
-    }
-
-    // 3. Simpan file sebelum memperbarui URL di database.
-    const fileName = file.originalname;
-    const filePath = join(uploadDirectory, fileName);
-
-    writeFileSync(filePath, file.buffer);
-
-    // 4. Simpan URL relatif agar tetap valid di semua environment.
-    const logoUrl = `/uploads/organizations/${organizationId}/${fileName}`;
-
-    try {
-      const updatedOrganization = await this.organizationRepository.update(
-        organizationId,
-        { logoUrl },
-      );
-
-      // Hapus file lama hanya setelah URL baru berhasil disimpan.
-      if (organization.logoUrl && organization.logoUrl !== logoUrl) {
-        const oldLogoPath = join(
-          process.cwd(),
-          organization.logoUrl.replace(/^[/\\]+/, ''),
-        );
-
-        if (existsSync(oldLogoPath)) {
-          unlinkSync(oldLogoPath);
-        }
-      }
-
-      return updatedOrganization;
-    } catch (error) {
-      if (existsSync(filePath)) {
-        unlinkSync(filePath);
-      }
-
-      throw error;
-    }
+    return true;
   }
 }

@@ -6,7 +6,6 @@ import {
   Param,
   Patch,
   Post,
-  Put,
   Query,
   UploadedFile,
   UseInterceptors,
@@ -33,6 +32,13 @@ import type { FileUpload } from '../common/types/file-upload.types.js';
 import { FileImageValidationPipe } from '../common/pipes/file-image-validation.pipe.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { GetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
+import {
+  addressExample,
+  emailExample,
+  logoUrlExample,
+  organizationNameExample,
+  phoneExample,
+} from '../common/constants/api-value-example.constants.js';
 
 @ApiTags('organizations')
 @Controller('organizations')
@@ -49,6 +55,7 @@ export class OrganizationController {
   }
 
   @Get(':id')
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Retrieve an organization by id' })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
   @ApiOkResponse({ type: OrganizationResponseDto })
@@ -66,10 +73,10 @@ export class OrganizationController {
     schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', example: 'Azmi Company' },
-        address: { type: 'string', example: 'Jl. Pegangsangan Timur No. 12' },
-        email: { type: 'email', example: 'user@example.com' },
-        phone: { type: 'string', example: '08976573345' },
+        name: { type: 'string', example: organizationNameExample },
+        address: { type: 'string', example: addressExample },
+        email: { type: 'email', example: emailExample },
+        phone: { type: 'string', example: phoneExample },
         file: { type: 'string', format: 'binary' },
       },
       required: ['name', 'address', 'email', 'phone', 'file'],
@@ -85,40 +92,43 @@ export class OrganizationController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update an organization by id' })
-  @ApiOkResponse({ type: OrganizationResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid request payload' })
-  @ApiNotFoundResponse({ description: 'Organization not found' })
-  update(@Param('id') id: string, @Body() dto: UpdateOrganizationDto) {
-    return this.organizationService.update(id, dto);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete an organization by id' })
-  @ApiOkResponse({ description: 'Organization deleted successfully' })
-  @ApiNotFoundResponse({ description: 'Organization not found' })
-  delete(@Param('id') id: string) {
-    return this.organizationService.delete(id);
-  }
-
-  @Put(':organizationId/logo')
+  @Roles(UserRole.SUPER_ADMIN)
   @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({ summary: 'Change an organization logo' })
+  @ApiOperation({ summary: 'Update an organization by id' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
+        name: { type: 'string', example: organizationNameExample },
+        address: { type: 'string', example: addressExample },
+        email: { type: 'email', example: emailExample },
+        phone: { type: 'string', example: phoneExample },
         file: { type: 'string', format: 'binary' },
+        logoUrl: { type: 'string', example: logoUrlExample },
       },
-      required: ['file'],
+      // required: ['name', 'address', 'email', 'phone', 'file'],
     },
   })
-  @ApiBadRequestResponse({ description: 'An image file is required' })
-  uploadLogo(
-    @Param('organizationId') organizationId: string,
-    @UploadedFile(new FileImageValidationPipe()) file: FileUpload,
+  @ApiOkResponse({ type: OrganizationResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid request payload' })
+  @ApiNotFoundResponse({ description: 'Organization not found' })
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrganizationDto,
+    @UploadedFile(new FileImageValidationPipe(false)) file?: FileUpload,
   ) {
-    return this.organizationService.uploadLogo(organizationId, file);
+    return this.organizationService.update(id, dto, file);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete an organization by id' })
+  @ApiOkResponse({
+    description: 'Organization deleted successfully',
+    type: Boolean,
+  })
+  @ApiNotFoundResponse({ description: 'Organization not found' })
+  delete(@Param('id') id: string) {
+    return this.organizationService.delete(id);
   }
 }

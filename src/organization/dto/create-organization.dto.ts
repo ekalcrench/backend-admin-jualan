@@ -1,23 +1,29 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import {
+  addressExample,
+  emailExample,
+  organizationNameExample,
+  phoneExample,
+} from '../../common/constants/api-value-example.constants.js';
 
 export class CreateOrganizationDto {
-  @ApiProperty({ example: 'Azmi Company' })
+  @ApiProperty({ example: organizationNameExample })
   @IsString()
   @IsNotEmpty()
   name!: string;
 
-  @ApiProperty({ example: 'Jl. Pegangsangan Timur No. 12' })
+  @ApiProperty({ example: addressExample })
   @IsString()
   @IsNotEmpty()
   address!: string;
 
-  @ApiProperty({ example: 'user@example.com' })
+  @ApiProperty({ example: emailExample })
   @IsEmail()
   @IsNotEmpty()
   email!: string;
 
-  @ApiProperty({ example: '08976573345' })
+  @ApiProperty({ example: phoneExample })
   @IsString()
   @IsNotEmpty()
   phone!: string;
