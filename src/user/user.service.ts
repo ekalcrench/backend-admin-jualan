@@ -45,6 +45,12 @@ export class UserService {
     return this.toResponse(user);
   }
 
+  async findOrganizationsById(id: string) {
+    const organizations = await this.userRepository.findOrganizationsById(id);
+
+    return organizations;
+  }
+
   async create(dto: CreateUserDto) {
     const existingUser = await this.userRepository.findByEmail(dto.email);
 

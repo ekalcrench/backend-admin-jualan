@@ -63,6 +63,36 @@ export class UserRepository {
     });
   }
 
+  async findOrganizationsById(id: string) {
+    return this.prisma.organization
+      .findMany({
+        where: {
+          organizationUsers: {
+            some: { userId: id },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          logoUrl: true,
+          organizationUsers: {
+            where: { userId: id },
+            select: {
+              role: true,
+              status: true,
+            },
+          },
+        },
+      })
+      .then((organizations) =>
+        organizations.map(({ organizationUsers, ...organization }) => ({
+          ...organization,
+          role: organizationUsers[0].role,
+          status: organizationUsers[0].status,
+        })),
+      );
+  }
+
   findByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },

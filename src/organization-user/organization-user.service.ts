@@ -8,10 +8,10 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as argon2 from 'argon2';
 import { UserResponseDto } from './dto/user-response.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
-import { OrganizationUserRepository } from './organization-users.repository.js';
+import { OrganizationUserRepository } from './organization-user.repository.js';
 
 @Injectable()
-export class UserService {
+export class OrganizationUserService {
   constructor(
     private readonly organizationUserRepository: OrganizationUserRepository,
   ) {}

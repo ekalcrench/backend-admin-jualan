@@ -5,12 +5,14 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { UserModule } from './user/user.module.js';
 import { OrganizationModule } from './organization/organization.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { OrganizationUserModule } from './organization-user/organization-user.module.js';
 
 @Module({
   imports: [
     PrismaModule,
     UserModule,
     OrganizationModule,
+    OrganizationUserModule,
     AuthModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),

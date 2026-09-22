@@ -25,6 +25,7 @@ import { Roles } from '../auth/decorators/rolse.decorator.js';
 import { UserRole } from '../common/enums/user-role.enum.js';
 import { GetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { UserOrganizationResponseDto } from './dto/user-organization-response.dto.js';
 
 @ApiTags('users')
 @Controller('users')
@@ -48,6 +49,15 @@ export class UserController {
   @ApiNotFoundResponse({ description: 'User not found' })
   findById(@Param('id') id: string) {
     return this.userService.findById(id);
+  }
+
+  @Get(':id/organizations')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Retrieve organizations linked to a user' })
+  @ApiParam({ name: 'id', description: 'User UUID' })
+  @ApiOkResponse({ type: UserOrganizationResponseDto, isArray: true })
+  findOrganizationsById(@Param('id') id: string) {
+    return this.userService.findOrganizationsById(id);
   }
 
   @Patch(':id')
