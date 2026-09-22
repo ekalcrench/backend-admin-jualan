@@ -17,10 +17,4 @@ export const sortMap = {
   '-email': {
     email: 'desc',
   },
-  phone: {
-    phone: 'asc',
-  },
-  '-phone': {
-    phone: 'desc',
-  },
 } as const;

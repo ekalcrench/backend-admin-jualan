@@ -10,12 +10,11 @@ import { LoginDto } from './dto/login.dto.js';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { CreateUserDto } from './dto/create-user.dto.js';
-import { UserStatus } from '../common/enums/user-status.enum.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { EmailService } from '../email/email.service.js';
-import { UserService } from '../user/user.service.js';
 import { ResendOtpDto } from './dto/resend-otp.dto.js';
 import { UserResponseDto } from '../user/dto/user-response.dto.js';
+import { UserStatus } from '../../prisma/generated/prisma/enums.js';
 
 @Injectable()
 export class AuthService {
@@ -23,7 +22,6 @@ export class AuthService {
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
-    private readonly userService: UserService,
   ) {}
 
   private toResponse(user: any): UserResponseDto {
@@ -67,7 +65,7 @@ export class AuthService {
     const existingUser = await this.userRepository.findByEmail(dto.email);
 
     if (existingUser) {
-      if (existingUser.status === UserStatus.PENDING_EMAIL.toString()) {
+      if (existingUser.status === UserStatus.PENDING_EMAIL) {
         await this.resendOtp({ email: dto.email });
 
         return this.toResponse(existingUser);
@@ -93,10 +91,10 @@ export class AuthService {
   }
 
   async verifyRegistrationCheck(email: string) {
-    const user = await this.userService.findByEmail(email);
+    const user = await this.userRepository.findByEmail(email);
 
     if (!user) {
-      throw new NotFoundException('Email belum terdaftar');
+      throw new NotFoundException('User not found');
     }
 
     if (user.status !== UserStatus.PENDING_EMAIL) {

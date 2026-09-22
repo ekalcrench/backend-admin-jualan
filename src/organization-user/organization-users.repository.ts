@@ -5,7 +5,7 @@ import { FindByPagesParams } from './types/find-by-pages-params.types.js';
 import { sortMap } from './constants/sort.map.constants.js';
 
 @Injectable()
-export class UserRepository {
+export class OrganizationUserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll() {
@@ -13,40 +13,46 @@ export class UserRepository {
   }
 
   async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, search, role, status } = data;
+    const { page, size, sortBy, search, organizationId } = data;
 
     const skip = (page - 1) * size;
 
-    const where: Prisma.UserWhereInput = search
+    const where: Prisma.OrganizationUserWhereInput = search
       ? {
-          OR: [
-            {
-              name: {
-                contains: search,
-                mode: 'insensitive',
+          ...(organizationId && { organizationId }),
+          user: {
+            OR: [
+              {
+                name: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
               },
-            },
-            {
-              email: {
-                contains: search,
-                mode: 'insensitive',
+              {
+                email: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
               },
-            },
-          ],
-          ...(role && { role }),
-          ...(status && { status }),
+            ],
+          },
         }
       : {};
 
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
+      this.prisma.organizationUser.findMany({
         skip,
         take: size,
         where,
-        orderBy: sortMap[sortBy] ?? sortMap['-createdAt'],
+        include: {
+          user: true,
+        },
+        orderBy: {
+          user: sortMap[sortBy] ?? sortMap['-createdAt'],
+        },
       }),
 
-      this.prisma.user.count({
+      this.prisma.organizationUser.count({
         where,
       }),
     ]);

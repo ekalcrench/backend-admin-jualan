@@ -29,6 +29,12 @@ export class OrganizationRepository {
               },
             },
             {
+              address: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
               phone: {
                 contains: search,
               },

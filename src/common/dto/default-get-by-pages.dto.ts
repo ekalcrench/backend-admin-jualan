@@ -1,13 +1,19 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import {
+  IsString,
+  IsOptional,
+  IsNotEmpty,
+  IsNumber,
+  Min,
+} from 'class-validator';
 import {
   pageExample,
   pageSizeExample,
   sortByExample,
 } from '../constants/api-value-example.constants.js';
 
-export class PaginationDto {
+export class DefaultGetByPagesDto {
   @ApiProperty({ example: pageExample })
   @Type(() => Number)
   @IsNumber()
@@ -26,4 +32,9 @@ export class PaginationDto {
   @IsString()
   @IsNotEmpty()
   sortBy!: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  search?: string;
 }

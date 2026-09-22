@@ -3,17 +3,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRepository } from './user.repository.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as argon2 from 'argon2';
 import { UserResponseDto } from './dto/user-response.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
-import { UserStatus } from '../common/enums/user-status.enum.js';
+import { OrganizationUserRepository } from './organization-users.repository.js';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(
+    private readonly organizationUserRepository: OrganizationUserRepository,
+  ) {}
 
   private toResponse(user: any): UserResponseDto {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -22,7 +23,8 @@ export class UserService {
   }
 
   async findByPages(dto: GetByPagesDto) {
-    const { items, total } = await this.userRepository.findByPages(dto);
+    const { items, total } =
+      await this.organizationUserRepository.findByPages(dto);
 
     return {
       items,
@@ -36,7 +38,7 @@ export class UserService {
   }
 
   async findById(id: string) {
-    const user = await this.userRepository.findById(id);
+    const user = await this.organizationUserRepository.findById(id);
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -46,7 +48,9 @@ export class UserService {
   }
 
   async create(dto: CreateUserDto) {
-    const existingUser = await this.userRepository.findByEmail(dto.email);
+    const existingUser = await this.organizationUserRepository.findByEmail(
+      dto.email,
+    );
 
     if (existingUser) {
       throw new ConflictException('User already exists');
@@ -54,7 +58,7 @@ export class UserService {
 
     const hashedPassword = await argon2.hash(dto.password);
 
-    const user = await this.userRepository.create({
+    const user = await this.organizationUserRepository.create({
       ...dto,
       password: hashedPassword,
     });
@@ -63,49 +67,38 @@ export class UserService {
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    const existingUser = await this.userRepository.findById(id);
+    const existingUser = await this.organizationUserRepository.findById(id);
 
     if (!existingUser) {
       throw new NotFoundException('User not found');
     }
 
     if (dto.email) {
-      const sameEmailUser = await this.userRepository.findByEmail(dto.email);
+      const sameEmailUser = await this.organizationUserRepository.findByEmail(
+        dto.email,
+      );
 
       if (sameEmailUser && sameEmailUser.id !== id) {
         throw new ConflictException('Email already exists');
       }
     }
 
-    const user = await this.userRepository.update(id, dto);
+    const user = await this.organizationUserRepository.update(id, dto);
 
     return this.toResponse(user);
   }
 
-  async suspend(id: string) {
-    const user = await this.userRepository.findById(id);
+  async delete(id: string) {
+    const user = await this.organizationUserRepository.findById(id);
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const updatedUser = await this.userRepository.update(id, {
-      status: UserStatus.SUSPENDED,
-    });
+    await this.organizationUserRepository.delete(id);
 
-    return this.toResponse(updatedUser);
-  }
-  async activate(id: string) {
-    const user = await this.userRepository.findById(id);
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const updatedUser = await this.userRepository.update(id, {
-      status: UserStatus.ACTIVE,
-    });
-
-    return this.toResponse(updatedUser);
+    return {
+      message: 'User deleted successfully',
+    };
   }
 }

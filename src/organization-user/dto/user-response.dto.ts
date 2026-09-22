@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, IntersectionType } from '@nestjs/swagger';
 import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
 import { UserRole } from '../../common/enums/user-role.enum.js';
 import { UserStatus } from '../../common/enums/user-status.enum.js';
@@ -7,7 +7,7 @@ import {
   personNameExample,
 } from '../../common/constants/api-value-example.constants.js';
 
-export class UserResponseDto extends BaseResponseDto {
+export class UserResponseDto extends IntersectionType(BaseResponseDto) {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 

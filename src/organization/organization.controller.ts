@@ -122,6 +122,7 @@ export class OrganizationController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete an organization by id' })
   @ApiOkResponse({
     description: 'Organization deleted successfully',
