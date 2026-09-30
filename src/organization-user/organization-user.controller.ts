@@ -22,7 +22,7 @@ import { OrganizationUserService } from './organization-user.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
-import { Roles } from '../auth/decorators/rolse.decorator.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
 import { UserRole } from '../common/enums/user-role.enum.js';
 import { GetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';

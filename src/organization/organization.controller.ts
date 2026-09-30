@@ -25,7 +25,7 @@ import { OrganizationService } from './organization.service.js';
 import { CreateOrganizationDto } from './dto/create-organization.dto.js';
 import { OrganizationResponseDto } from './dto/organization-response.dto.js';
 import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
-import { Roles } from '../auth/decorators/rolse.decorator.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
 import { UserRole } from '../common/enums/user-role.enum.js';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { FileUpload } from '../common/types/file-upload.types.js';

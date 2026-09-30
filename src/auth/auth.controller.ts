@@ -7,8 +7,10 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
@@ -27,6 +29,9 @@ import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { ResendOtpDto } from './dto/resend-otp.dto.js';
 import { LoginResponseDto } from './dto/login-response.dto.js';
 import { ResendOtpResponseDto } from './dto/resend-otp-response.dto.js';
+import { LoginOrganizationDto } from './dto/login-organization.dto.js';
+import { LoginOrganizationResponseDto } from './dto/login-organization-response.dto.js';
+import type { Request } from 'express';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -47,6 +52,28 @@ export class AuthController {
     const { user, token } = await this.authService.login(dto);
 
     return { user, accessToken: token };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('login/organization')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Select an organization and receive its access token',
+  })
+  @ApiOkResponse({
+    description: 'Returns an organization-scoped access token',
+    type: LoginOrganizationResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiNotFoundResponse({ description: 'User not found' })
+  async loginOrganization(
+    @Body() dto: LoginOrganizationDto,
+    @Req() request: Request & { user: { sub: string } },
+  ) {
+    return this.authService.loginOrganization(
+      request.user.sub,
+      dto.organizationId,
+    );
   }
 
   @Public()

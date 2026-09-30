@@ -8,6 +8,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { JwtModule } from '@nestjs/jwt';
 import { EmailModule } from '../email/email.module.js';
 import { RolesGuard } from './guards/role.guard.js';
+import { OrganizationRolesGuard } from './guards/organization-role.guard.js';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { RolesGuard } from './guards/role.guard.js';
     AuthService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: OrganizationRolesGuard },
   ],
   exports: [AuthService],
 })

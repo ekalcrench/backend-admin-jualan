@@ -93,6 +93,13 @@ export class UserRepository {
       );
   }
 
+  findOrganizationMembership(userId: string, organizationId: string) {
+    return this.prisma.organizationUser.findFirst({
+      where: { userId, organizationId },
+      select: { role: true, status: true },
+    });
+  }
+
   findByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },

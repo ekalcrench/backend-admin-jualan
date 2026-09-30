@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -14,7 +15,10 @@ import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { EmailService } from '../email/email.service.js';
 import { ResendOtpDto } from './dto/resend-otp.dto.js';
 import { UserResponseDto } from '../user/dto/user-response.dto.js';
-import { UserStatus } from '../../prisma/generated/prisma/enums.js';
+import {
+  OrganizationUserStatus,
+  UserStatus,
+} from '../../prisma/generated/prisma/enums.js';
 
 @Injectable()
 export class AuthService {
@@ -56,9 +60,37 @@ export class AuthService {
       sub: user.id,
       name: user.email,
       roles: [user.role],
+      organization_roles: [],
     });
 
     return { user, token };
+  }
+
+  async loginOrganization(userId: string, organizationId: string) {
+    const user = await this.userRepository.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const membership = await this.userRepository.findOrganizationMembership(
+      userId,
+      organizationId,
+    );
+
+    if (!membership || membership.status !== OrganizationUserStatus.APPROVED) {
+      throw new ForbiddenException('Approved organization membership required');
+    }
+
+    const accessToken = await this.jwtService.signAsync({
+      sub: user.id,
+      name: user.email,
+      roles: [user.role],
+      organizationId,
+      organization_roles: [membership.role],
+    });
+
+    return { accessToken };
   }
 
   async register(dto: CreateUserDto) {
