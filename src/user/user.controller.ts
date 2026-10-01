@@ -93,7 +93,7 @@ export class UserController {
   }
 
   @Post(':id/activate')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @ApiOperation({ summary: 'Change user status into ACTIVE' })
   @ApiOkResponse({ type: UserResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
