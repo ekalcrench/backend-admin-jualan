@@ -26,6 +26,8 @@ import { UserRole } from '../common/enums/user-role.enum.js';
 import { GetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UserOrganizationResponseDto } from './dto/user-organization-response.dto.js';
+import { GetUserOptionsDto } from './dto/get-user-options.dto.js';
+import { UserOptionResponseDto } from './dto/user-option-response.dto.js';
 
 @ApiTags('users')
 @Controller('users')
@@ -33,7 +35,7 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve organizations by pages' })
   @ApiOkResponse({ type: GetByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
@@ -41,8 +43,16 @@ export class UserController {
     return this.userService.findByPages(query);
   }
 
+  @Get('options')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER)
+  @ApiOperation({ summary: 'Retrieve user options by search query' })
+  @ApiOkResponse({ type: UserOptionResponseDto, isArray: true })
+  findOptions(@Query() query: GetUserOptionsDto) {
+    return this.userService.findOptions(query.search);
+  }
+
   @Get(':id')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve a user by id' })
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiOkResponse({ type: UserResponseDto })
@@ -52,7 +62,7 @@ export class UserController {
   }
 
   @Get(':id/organizations')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Retrieve organizations linked to a user' })
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiOkResponse({ type: UserOrganizationResponseDto, isArray: true })

@@ -12,6 +12,24 @@ export class UserRepository {
     return this.prisma.user.findMany();
   }
 
+  findOptions(search?: string) {
+    return this.prisma.user.findMany({
+      where: search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : undefined,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+  }
+
   async findByPages(data: FindByPagesParams) {
     const { page, size, sortBy, search, role, status } = data;
 

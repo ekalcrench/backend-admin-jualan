@@ -78,8 +78,16 @@ export class AuthService {
       organizationId,
     );
 
-    if (!membership || membership.status !== OrganizationUserStatus.APPROVED) {
-      throw new ForbiddenException('Approved organization membership required');
+    if (!membership) {
+      throw new ForbiddenException(
+        'User belum terdaftar di organisasi, hubungi admin untuk bertanya',
+      );
+    }
+
+    if (membership.status !== OrganizationUserStatus.APPROVED) {
+      throw new ForbiddenException(
+        'Akses user untuk login belum disetujui Pemilik Usaha',
+      );
     }
 
     const accessToken = await this.jwtService.signAsync({

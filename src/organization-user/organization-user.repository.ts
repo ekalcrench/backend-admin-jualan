@@ -17,27 +17,27 @@ export class OrganizationUserRepository {
 
     const skip = (page - 1) * size;
 
-    const where: Prisma.OrganizationUserWhereInput = search
-      ? {
-          ...(organizationId && { organizationId }),
-          user: {
-            OR: [
-              {
-                name: {
-                  contains: search,
-                  mode: 'insensitive',
-                },
+    const where: Prisma.OrganizationUserWhereInput = {
+      organizationId,
+      ...(search && {
+        user: {
+          OR: [
+            {
+              name: {
+                contains: search,
+                mode: 'insensitive',
               },
-              {
-                email: {
-                  contains: search,
-                  mode: 'insensitive',
-                },
+            },
+            {
+              email: {
+                contains: search,
+                mode: 'insensitive',
               },
-            ],
-          },
-        }
-      : {};
+            },
+          ],
+        },
+      }),
+    };
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.organizationUser.findMany({
@@ -45,7 +45,12 @@ export class OrganizationUserRepository {
         take: size,
         where,
         include: {
-          user: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
         },
         orderBy: {
           user: sortMap[sortBy] ?? sortMap['-createdAt'],
@@ -64,33 +69,27 @@ export class OrganizationUserRepository {
   }
 
   findById(id: string) {
-    return this.prisma.user.findUnique({
+    return this.prisma.organizationUser.findUnique({
       where: { id },
     });
   }
 
-  findByEmail(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email },
+  findByUserId(userId: string) {
+    return this.prisma.organizationUser.findFirst({
+      where: { userId },
     });
   }
 
-  create(data: Prisma.UserCreateInput) {
-    return this.prisma.user.create({
+  create(data: Prisma.OrganizationUserCreateInput) {
+    return this.prisma.organizationUser.create({
       data,
     });
   }
 
-  update(id: string, data: Prisma.UserUpdateInput) {
-    return this.prisma.user.update({
+  update(id: string, data: Prisma.OrganizationUserUpdateInput) {
+    return this.prisma.organizationUser.update({
       where: { id },
       data,
-    });
-  }
-
-  delete(id: string) {
-    return this.prisma.user.delete({
-      where: { id },
     });
   }
 }

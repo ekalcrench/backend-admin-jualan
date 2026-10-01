@@ -24,5 +24,5 @@ export class UserResponseDto extends BaseResponseDto {
   status!: UserStatus;
 
   @ApiProperty({ enum: UserRole })
-  role!: UserStatus;
+  role!: UserRole;
 }

@@ -1,14 +1,15 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto.js';
-import { UpdateUserDto } from './dto/update-user.dto.js';
-import * as argon2 from 'argon2';
-import { UserResponseDto } from './dto/user-response.dto.js';
+import { CreateOrganizationUserDto } from './dto/create-organization-user.dto.js';
+import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { OrganizationUserRepository } from './organization-user.repository.js';
+import { OrganizationUserStatus } from '../../prisma/generated/prisma/enums.js';
 
 @Injectable()
 export class OrganizationUserService {
@@ -16,18 +17,29 @@ export class OrganizationUserService {
     private readonly organizationUserRepository: OrganizationUserRepository,
   ) {}
 
-  private toResponse(user: any): UserResponseDto {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...safeUser } = user;
-    return safeUser;
-  }
+  async findByPages(
+    dto: GetByPagesDto,
+    jwtPayload: { organizationId?: string },
+  ) {
+    const { organizationId } = jwtPayload;
 
-  async findByPages(dto: GetByPagesDto) {
-    const { items, total } =
-      await this.organizationUserRepository.findByPages(dto);
+    if (!organizationId) {
+      throw new ForbiddenException('Organization context is required');
+    }
+
+    const { items, total } = await this.organizationUserRepository.findByPages({
+      ...dto,
+      organizationId,
+    });
 
     return {
-      items,
+      items: items.map(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ({ user, organizationId: _organizationId, ...organizationUser }) => ({
+          ...organizationUser,
+          ...user,
+        }),
+      ),
       pagination: {
         page: dto.page,
         size: dto.size,
@@ -44,61 +56,102 @@ export class OrganizationUserService {
       throw new NotFoundException('User not found');
     }
 
-    return this.toResponse(user);
+    return user;
   }
 
-  async create(dto: CreateUserDto) {
-    const existingUser = await this.organizationUserRepository.findByEmail(
-      dto.email,
+  async create(
+    dto: CreateOrganizationUserDto,
+    jwtPayload: { organizationId?: string },
+  ) {
+    const { organizationId } = jwtPayload;
+
+    if (!organizationId) {
+      throw new ForbiddenException('Organization context is required');
+    }
+
+    const existingUser = await this.organizationUserRepository.findByUserId(
+      dto.userId,
     );
 
     if (existingUser) {
-      throw new ConflictException('User already exists');
+      throw new ConflictException('User sudah terdaftar');
     }
 
-    const hashedPassword = await argon2.hash(dto.password);
+    console.log('>>> dto : ', dto);
 
     const user = await this.organizationUserRepository.create({
-      ...dto,
-      password: hashedPassword,
+      role: dto.role,
+      status: dto.status,
+      user: { connect: { id: dto.userId } },
+      organization: { connect: { id: organizationId } },
     });
 
-    return this.toResponse(user);
+    return user;
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  async update(id: string, dto: UpdateOrganizationUserDto) {
     const existingUser = await this.organizationUserRepository.findById(id);
 
     if (!existingUser) {
       throw new NotFoundException('User not found');
     }
 
-    if (dto.email) {
-      const sameEmailUser = await this.organizationUserRepository.findByEmail(
-        dto.email,
-      );
-
-      if (sameEmailUser && sameEmailUser.id !== id) {
-        throw new ConflictException('Email already exists');
-      }
-    }
-
     const user = await this.organizationUserRepository.update(id, dto);
 
-    return this.toResponse(user);
+    return user;
   }
 
-  async delete(id: string) {
+  async suspend(id: string) {
     const user = await this.organizationUserRepository.findById(id);
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    await this.organizationUserRepository.delete(id);
+    if (user.status !== OrganizationUserStatus.APPROVED) {
+      throw new BadRequestException('Status user tidak valid untuk disuspensi');
+    }
 
-    return {
-      message: 'User deleted successfully',
-    };
+    const updatedUser = await this.organizationUserRepository.update(id, {
+      status: OrganizationUserStatus.SUSPENDED,
+    });
+
+    return updatedUser;
+  }
+
+  async activate(id: string) {
+    const user = await this.organizationUserRepository.findById(id);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status !== OrganizationUserStatus.SUSPENDED) {
+      throw new BadRequestException('Status user tidak valid untuk diaktifkan');
+    }
+
+    const updatedUser = await this.organizationUserRepository.update(id, {
+      status: OrganizationUserStatus.APPROVED,
+    });
+
+    return updatedUser;
+  }
+
+  async approve(id: string) {
+    const user = await this.organizationUserRepository.findById(id);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status !== OrganizationUserStatus.PENDING_APPROVAL) {
+      throw new BadRequestException('Status user tidak valid untuk disetujui');
+    }
+
+    const updatedUser = await this.organizationUserRepository.update(id, {
+      status: OrganizationUserStatus.APPROVED,
+    });
+
+    return updatedUser;
   }
 }

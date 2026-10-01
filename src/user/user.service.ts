@@ -35,6 +35,10 @@ export class UserService {
     };
   }
 
+  findOptions(search?: string) {
+    return this.userRepository.findOptions(search);
+  }
+
   async findById(id: string) {
     const user = await this.userRepository.findById(id);
 
