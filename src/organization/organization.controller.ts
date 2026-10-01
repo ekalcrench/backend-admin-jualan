@@ -46,7 +46,7 @@ export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve organizations by pages' })
   @ApiOkResponse({ type: GetByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
@@ -55,7 +55,7 @@ export class OrganizationController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve an organization by id' })
   @ApiParam({ name: 'id', description: 'Organization UUID' })
   @ApiOkResponse({ type: OrganizationResponseDto })
@@ -65,7 +65,7 @@ export class OrganizationController {
   }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Create a new organization' })
   @ApiConsumes('multipart/form-data')
@@ -92,7 +92,7 @@ export class OrganizationController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Update an organization by id' })
   @ApiConsumes('multipart/form-data')
