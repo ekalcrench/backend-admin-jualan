@@ -6,6 +6,8 @@ import { UserModule } from './user/user.module.js';
 import { OrganizationModule } from './organization/organization.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { OrganizationUserModule } from './organization-user/organization-user.module.js';
+import { InventoryItemModule } from './inventory-item/inventory-item.module.js';
+import { PurchaseModule } from './purchase/purchase.module.js';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { OrganizationUserModule } from './organization-user/organization-user.mo
     UserModule,
     OrganizationModule,
     OrganizationUserModule,
+    InventoryItemModule,
+    PurchaseModule,
     AuthModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
