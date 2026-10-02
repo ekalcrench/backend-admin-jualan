@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { OrganizationUserModule } from './organization-user/organization-user.module.js';
 import { InventoryItemModule } from './inventory-item/inventory-item.module.js';
 import { PurchaseModule } from './purchase/purchase.module.js';
+import { InitModule } from './init/init.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PurchaseModule } from './purchase/purchase.module.js';
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
     }),
+    ...(process.env.NODE_ENV === 'development' ? [InitModule] : []),
   ],
 })
 export class AppModule {}
