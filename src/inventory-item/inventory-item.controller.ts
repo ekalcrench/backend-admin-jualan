@@ -24,7 +24,7 @@ import { OrganizationRoles } from '../auth/decorators/organization-roles.decorat
 import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
-import { GetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
+import { InventoryItemGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { InventoryItemResponseDto } from './dto/inventory-item-response.dto.js';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
 import { InventoryItemService } from './inventory-item.service.js';
@@ -41,7 +41,7 @@ export class InventoryItemController {
     OrganizationUserRole.MEMBER,
   )
   @ApiOperation({ summary: 'Retrieve inventory items by pages' })
-  @ApiOkResponse({ type: GetByPagesResponseDto })
+  @ApiOkResponse({ type: InventoryItemGetByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
     @Query() query: GetByPagesDto,

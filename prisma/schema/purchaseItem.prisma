@@ -10,9 +10,9 @@ model PurchaseItem {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
-  purchase      Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  inventoryItem InventoryItem  @relation(fields: [inventoryItemId], references: [id])
-  inventoryLots InventoryLot[]
+  purchase      Purchase      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryLot  InventoryLot?
 
   @@index([purchaseId])
   @@index([inventoryItemId])

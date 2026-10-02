@@ -14,7 +14,7 @@ export class InventoryItemByPagesDto extends InventoryItemResponseDto {
   averageCost!: number;
 }
 
-export class GetByPagesResponseDto {
+export class InventoryItemGetByPagesResponseDto {
   @ApiProperty({ type: [InventoryItemByPagesDto] })
   items!: InventoryItemByPagesDto[];
 

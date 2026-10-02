@@ -1,7 +1,7 @@
 model InventoryLot {
   id              String @id @default(uuid()) @db.Uuid
   inventoryItemId String @map("inventory_item_id") @db.Uuid
-  purchaseItemId  String @map("purchase_item_id") @db.Uuid
+  purchaseItemId  String @unique @map("purchase_item_id") @db.Uuid
 
   quantity          Decimal @db.Decimal(15, 2)
   remainingQuantity Decimal @map("remaining_quantity") @db.Decimal(15, 2)
