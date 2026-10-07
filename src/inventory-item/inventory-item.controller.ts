@@ -28,6 +28,8 @@ import { InventoryItemGetByPagesResponseDto } from './dto/get-by-pages-response.
 import { InventoryItemResponseDto } from './dto/inventory-item-response.dto.js';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
 import { InventoryItemService } from './inventory-item.service.js';
+import { GetInventoryItemOptionsDto } from './dto/get-inventory-item-options.dto.js';
+import { InventoryItemOptionsResponseDto } from './dto/inventory-item-options-response.dto.js';
 
 @ApiTags('inventory-items')
 @Controller('inventory-items')
@@ -48,6 +50,18 @@ export class InventoryItemController {
     @Req() request: Request & { user: { organizationId?: string } },
   ) {
     return this.inventoryItemService.findByPages(query, request.user);
+  }
+
+  @Get('options')
+  @OrganizationRoles(
+    OrganizationUserRole.OWNER,
+    OrganizationUserRole.ADMIN,
+    OrganizationUserRole.MEMBER,
+  )
+  @ApiOperation({ summary: 'Retrieve inventory items options by search query' })
+  @ApiOkResponse({ type: InventoryItemOptionsResponseDto, isArray: true })
+  findOptions(@Query() query: GetInventoryItemOptionsDto) {
+    return this.inventoryItemService.findOptions(query.search);
   }
 
   @Get(':id')

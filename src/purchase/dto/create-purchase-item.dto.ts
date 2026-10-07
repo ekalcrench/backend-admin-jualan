@@ -25,13 +25,12 @@ export class CreatePurchaseItemDto {
   @Min(0)
   unitCost!: number;
 
-  @ApiPropertyOptional({ format: 'date-time' })
+  @ApiProperty({ format: 'date-time' })
   @IsDateString()
-  @IsOptional()
-  receivedAt?: string;
+  receivedAt!: string;
 
   @ApiPropertyOptional({ format: 'date-time', nullable: true })
   @IsDateString()
   @IsOptional()
-  expiredAt?: string | null;
+  expiredAt?: string;
 }

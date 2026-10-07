@@ -66,6 +66,10 @@ export class InventoryItemService {
     return item;
   }
 
+  findOptions(search?: string) {
+    return this.inventoryItemRepository.findOptions(search);
+  }
+
   async create(dto: CreateInventoryItemDto, context: OrganizationContext) {
     const organizationId = this.requireOrganizationId(context);
 

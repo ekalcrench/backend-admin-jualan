@@ -24,3 +24,7 @@ export const totalDataExample = 394;
 export const pageSizeExample = 20;
 
 export const sortByExample = '-createdAt';
+
+export const supplierNameExample = 'Yogya Toserba';
+
+export const invoiceExample = 'INV-001';

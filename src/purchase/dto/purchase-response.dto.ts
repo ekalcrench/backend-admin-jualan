@@ -1,5 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
+import {
+  invoiceExample,
+  supplierNameExample,
+} from '../../common/constants/api-value-example.constants.js';
 
 class PurchaseInventoryItemDto {
   @ApiProperty({ format: 'uuid' })
@@ -59,11 +63,11 @@ export class PurchaseResponseDto extends BaseResponseDto {
   @ApiProperty({ format: 'uuid' })
   organizationId!: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  supplierName!: string | null;
+  @ApiProperty({ description: supplierNameExample })
+  supplierName!: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  invoiceNumber!: string | null;
+  @ApiProperty({ description: invoiceExample })
+  invoiceNumber!: string;
 
   @ApiProperty({ type: String, format: 'date-time' })
   purchasedAt!: Date;

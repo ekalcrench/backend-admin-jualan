@@ -48,6 +48,21 @@ export class InventoryItemRepository {
     });
   }
 
+  findOptions(search?: string) {
+    return this.prisma.inventoryItem.findMany({
+      where: search
+        ? {
+            OR: [{ name: { contains: search, mode: 'insensitive' } }],
+          }
+        : undefined,
+      select: {
+        id: true,
+        name: true,
+        unit: true,
+      },
+    });
+  }
+
   create(data: Prisma.InventoryItemCreateInput) {
     return this.prisma.inventoryItem.create({ data });
   }

@@ -81,9 +81,7 @@ export class PurchaseService {
                 quantity: item.quantity,
                 remainingQuantity: item.quantity,
                 unitCost: item.unitCost,
-                receivedAt: item.receivedAt
-                  ? new Date(item.receivedAt)
-                  : new Date(dto.purchasedAt),
+                receivedAt: new Date(item.receivedAt),
                 expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
               },
             },
