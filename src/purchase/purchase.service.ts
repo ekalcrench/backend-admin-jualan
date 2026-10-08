@@ -112,6 +112,26 @@ export class PurchaseService {
       ...(dto.purchasedAt !== undefined && {
         purchasedAt: new Date(dto.purchasedAt),
       }),
+      ...(dto.purchaseItems !== undefined && {
+        purchaseItems: {
+          deleteMany: {},
+          create: dto.purchaseItems.map((item) => ({
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+            inventoryItem: { connect: { id: item.inventoryItemId } },
+            inventoryLot: {
+              create: {
+                inventoryItem: { connect: { id: item.inventoryItemId } },
+                quantity: item.quantity,
+                remainingQuantity: item.quantity,
+                unitCost: item.unitCost,
+                receivedAt: new Date(item.receivedAt),
+                expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
+              },
+            },
+          })),
+        },
+      }),
     };
 
     try {
