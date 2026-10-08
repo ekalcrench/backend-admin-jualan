@@ -6,12 +6,13 @@ import { FindByPagesParams } from './types/find-by-pages-params.types.js';
 
 const itemWithLots = {
   lots: {
+    orderBy: { receivedAt: 'asc' },
     select: {
       remainingQuantity: true,
       unitCost: true,
     },
   },
-};
+} satisfies Prisma.InventoryItemInclude;
 
 @Injectable()
 export class InventoryItemRepository {

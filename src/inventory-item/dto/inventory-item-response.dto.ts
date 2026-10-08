@@ -19,7 +19,12 @@ export class InventoryItemResponseDto extends BaseResponseDto {
   totalStock!: number;
 
   @ApiProperty({
-    description: 'Remaining-quantity-weighted average unit cost across lots',
+    description: 'Sum of unit costs across lots',
+  })
+  totalCost!: number;
+
+  @ApiProperty({
+    description: 'Sum of lot unit costs divided by total stock',
   })
   averageCost!: number;
 }

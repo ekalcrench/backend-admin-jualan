@@ -121,8 +121,8 @@ export class InventoryItemService {
       (total, lot) => total.plus(lot.remainingQuantity),
       new Prisma.Decimal(0),
     );
-    const weightedCost = item.lots.reduce(
-      (total, lot) => total.plus(lot.remainingQuantity.mul(lot.unitCost)),
+    const totalCost = item.lots.reduce(
+      (total, lot) => total.plus(lot.unitCost),
       new Prisma.Decimal(0),
     );
 
@@ -134,9 +134,10 @@ export class InventoryItemService {
       name: item.name,
       unit: item.unit,
       totalStock: totalStock.toNumber(),
+      totalCost: totalCost.toNumber(),
       averageCost: totalStock.isZero()
         ? 0
-        : weightedCost.dividedBy(totalStock).toNumber(),
+        : totalCost.dividedBy(totalStock).toNumber(),
     };
   }
 
