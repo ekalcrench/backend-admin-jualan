@@ -6,6 +6,7 @@ model InventoryLot {
   quantity          Decimal @db.Decimal(15, 2)
   remainingQuantity Decimal @map("remaining_quantity") @db.Decimal(15, 2)
   unitCost          Decimal @map("unit_cost") @db.Decimal(15, 3)
+  totalCost         Decimal @map("total_cost") @db.Decimal(15, 2)
 
   receivedAt DateTime  @map("received_at")
   expiredAt  DateTime? @map("expired_at")

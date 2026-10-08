@@ -21,9 +21,9 @@ export class CreatePurchaseItemDto {
 
   @ApiProperty({ minimum: 0, example: 12.5 })
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 3 })
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
-  unitCost!: number;
+  totalCost!: number;
 
   @ApiProperty({ format: 'date-time' })
   @IsDateString()

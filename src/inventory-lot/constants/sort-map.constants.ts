@@ -10,6 +10,8 @@ export const inventoryLotSortMap: Record<
   '-remainingQuantity': { remainingQuantity: 'desc' },
   unitCost: { unitCost: 'asc' },
   '-unitCost': { unitCost: 'desc' },
+  totalCost: { totalCost: 'asc' },
+  '-totalCost': { totalCost: 'desc' },
   receivedAt: { receivedAt: 'asc' },
   '-receivedAt': { receivedAt: 'desc' },
   createdAt: { createdAt: 'asc' },

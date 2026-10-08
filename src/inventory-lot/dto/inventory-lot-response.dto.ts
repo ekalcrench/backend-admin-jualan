@@ -13,6 +13,9 @@ export class InventoryLotResponseDto {
   @ApiProperty({ nullable: true })
   invoiceNumber!: string | null;
 
+  @ApiProperty({ nullable: true })
+  supplierName!: string | null;
+
   @ApiProperty()
   quantity!: number;
 
@@ -21,6 +24,9 @@ export class InventoryLotResponseDto {
 
   @ApiProperty()
   unitCost!: number;
+
+  @ApiProperty()
+  totalCost!: number;
 
   @ApiProperty()
   receivedAt!: Date;

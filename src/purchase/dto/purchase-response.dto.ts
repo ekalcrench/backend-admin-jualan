@@ -29,6 +29,9 @@ class PurchaseInventoryLotDto {
   @ApiProperty()
   unitCost!: number;
 
+  @ApiProperty()
+  totalCost!: number;
+
   @ApiProperty({ type: String, format: 'date-time' })
   receivedAt!: Date;
 
@@ -47,7 +50,7 @@ class PurchaseItemResponseDto {
   quantity!: number;
 
   @ApiProperty()
-  unitCost!: number;
+  totalCost!: number;
 
   @ApiProperty({ type: PurchaseInventoryItemDto })
   inventoryItem!: PurchaseInventoryItemDto;

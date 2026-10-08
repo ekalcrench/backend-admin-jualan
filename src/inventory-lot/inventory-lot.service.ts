@@ -45,17 +45,22 @@ export class InventoryLotService {
       quantity: Prisma.Decimal;
       remainingQuantity: Prisma.Decimal;
       unitCost: Prisma.Decimal;
-      purchaseItem: {
-        purchase: { invoiceNumber: string | null };
-      };
+      totalCost: Prisma.Decimal;
+      purchaseItem?: {
+        purchase: { invoiceNumber: string | null; supplierName: string | null };
+      } | null;
     } & Record<string, unknown>,
   ) {
+    const { purchaseItem, ...rest } = lot;
+
     return {
-      ...lot,
-      invoiceNumber: lot.purchaseItem.purchase.invoiceNumber,
+      ...rest,
+      invoiceNumber: purchaseItem?.purchase.invoiceNumber ?? null,
+      supplierName: purchaseItem?.purchase.supplierName ?? null,
       quantity: lot.quantity.toNumber(),
       remainingQuantity: lot.remainingQuantity.toNumber(),
       unitCost: lot.unitCost.toNumber(),
+      totalCost: lot.totalCost.toNumber(),
     };
   }
 }

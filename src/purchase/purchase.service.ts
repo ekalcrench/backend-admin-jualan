@@ -73,14 +73,15 @@ export class PurchaseService {
         purchaseItems: {
           create: dto.purchaseItems.map((item) => ({
             quantity: item.quantity,
-            unitCost: item.unitCost,
+            totalCost: item.totalCost,
             inventoryItem: { connect: { id: item.inventoryItemId } },
             inventoryLot: {
               create: {
                 inventoryItem: { connect: { id: item.inventoryItemId } },
                 quantity: item.quantity,
                 remainingQuantity: item.quantity,
-                unitCost: item.unitCost,
+                unitCost: item.totalCost / item.quantity,
+                totalCost: item.totalCost,
                 receivedAt: new Date(item.receivedAt),
                 expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
               },
@@ -117,14 +118,15 @@ export class PurchaseService {
           deleteMany: {},
           create: dto.purchaseItems.map((item) => ({
             quantity: item.quantity,
-            unitCost: item.unitCost,
+            totalCost: item.totalCost,
             inventoryItem: { connect: { id: item.inventoryItemId } },
             inventoryLot: {
               create: {
                 inventoryItem: { connect: { id: item.inventoryItemId } },
                 quantity: item.quantity,
                 remainingQuantity: item.quantity,
-                unitCost: item.unitCost,
+                unitCost: item.totalCost / item.quantity,
+                totalCost: item.totalCost,
                 receivedAt: new Date(item.receivedAt),
                 expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
               },
@@ -194,13 +196,14 @@ export class PurchaseService {
         id: string;
         inventoryItemId: string;
         quantity: Prisma.Decimal;
-        unitCost: Prisma.Decimal;
+        totalCost: Prisma.Decimal;
         inventoryItem: { id: string; name: string; unit: string };
         inventoryLot: {
           id: string;
           quantity: Prisma.Decimal;
           remainingQuantity: Prisma.Decimal;
           unitCost: Prisma.Decimal;
+          totalCost: Prisma.Decimal;
           receivedAt: Date;
           expiredAt: Date | null;
         } | null;
@@ -213,7 +216,7 @@ export class PurchaseService {
         id: item.id,
         inventoryItemId: item.inventoryItemId,
         quantity: item.quantity.toNumber(),
-        unitCost: item.unitCost.toNumber(),
+        totalCost: item.totalCost.toNumber(),
         inventoryItem: item.inventoryItem,
         inventoryLot: item.inventoryLot
           ? {
@@ -221,6 +224,7 @@ export class PurchaseService {
               quantity: item.inventoryLot.quantity.toNumber(),
               remainingQuantity: item.inventoryLot.remainingQuantity.toNumber(),
               unitCost: item.inventoryLot.unitCost.toNumber(),
+              totalCost: item.inventoryLot.totalCost.toNumber(),
               receivedAt: item.inventoryLot.receivedAt,
               expiredAt: item.inventoryLot.expiredAt,
             }

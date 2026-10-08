@@ -122,7 +122,7 @@ export class InventoryItemService {
       new Prisma.Decimal(0),
     );
     const totalCost = item.lots.reduce(
-      (total, lot) => total.plus(lot.unitCost),
+      (total, lot) => total.plus(lot.unitCost.mul(lot.remainingQuantity)),
       new Prisma.Decimal(0),
     );
 

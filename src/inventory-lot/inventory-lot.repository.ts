@@ -24,6 +24,10 @@ export class InventoryLotRepository {
                   contains: search,
                   mode: 'insensitive',
                 },
+                supplierName: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
               },
             },
           },
@@ -42,7 +46,7 @@ export class InventoryLotRepository {
           purchaseItem: {
             select: {
               purchase: {
-                select: { invoiceNumber: true },
+                select: { invoiceNumber: true, supplierName: true },
               },
             },
           },
