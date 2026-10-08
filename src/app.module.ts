@@ -9,6 +9,7 @@ import { OrganizationUserModule } from './organization-user/organization-user.mo
 import { InventoryItemModule } from './inventory-item/inventory-item.module.js';
 import { PurchaseModule } from './purchase/purchase.module.js';
 import { InitModule } from './init/init.module.js';
+import { InventoryLotModule } from './inventory-lot/inventory-lot.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { InitModule } from './init/init.module.js';
     OrganizationModule,
     OrganizationUserModule,
     InventoryItemModule,
+    InventoryLotModule,
     PurchaseModule,
     AuthModule,
     ServeStaticModule.forRoot({
