@@ -82,9 +82,11 @@ export class InventoryItemRepository {
   }
 
   delete(id: string) {
-    return this.prisma.inventoryItem.update({
-      where: { id },
-      data: { isActive: false },
-    });
+    return this.prisma.inventoryItem.delete({ where: { id } }).catch(() =>
+      this.prisma.inventoryItem.update({
+        where: { id },
+        data: { isActive: false },
+      }),
+    );
   }
 }
