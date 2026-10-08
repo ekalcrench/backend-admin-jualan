@@ -12,9 +12,14 @@ export class InventoryItemResponseDto extends BaseResponseDto {
   @ApiProperty({ maxLength: 255 })
   name!: string;
 
-  @ApiProperty({ default: true })
-  isActive!: boolean;
-
   @ApiProperty({ enum: InventoryUnit })
   unit!: InventoryUnit;
+
+  @ApiProperty({ description: 'Sum of remaining quantities across lots' })
+  totalStock!: number;
+
+  @ApiProperty({
+    description: 'Remaining-quantity-weighted average unit cost across lots',
+  })
+  averageCost!: number;
 }

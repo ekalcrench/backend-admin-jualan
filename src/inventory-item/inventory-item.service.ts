@@ -26,24 +26,7 @@ export class InventoryItemService {
     });
 
     return {
-      items: items.map(({ lots, ...item }) => {
-        const totalStock = lots.reduce(
-          (total, lot) => total.plus(lot.remainingQuantity),
-          new Prisma.Decimal(0),
-        );
-        const weightedCost = lots.reduce(
-          (total, lot) => total.plus(lot.remainingQuantity.mul(lot.unitCost)),
-          new Prisma.Decimal(0),
-        );
-
-        return {
-          ...item,
-          totalStock: totalStock.toNumber(),
-          averageCost: totalStock.isZero()
-            ? 0
-            : weightedCost.dividedBy(totalStock).toNumber(),
-        };
-      }),
+      items: items.map((item) => this.toResponse(item)),
       pagination: {
         page: dto.page,
         size: dto.size,
@@ -63,7 +46,7 @@ export class InventoryItemService {
       throw new NotFoundException('Inventory item not found');
     }
 
-    return item;
+    return this.toResponse(item);
   }
 
   findOptions(search: string | undefined, context: OrganizationContext) {
@@ -77,11 +60,13 @@ export class InventoryItemService {
     const organizationId = this.requireOrganizationId(context);
 
     try {
-      return await this.inventoryItemRepository.create({
+      const item = await this.inventoryItemRepository.create({
         name: dto.name,
         ...(dto.unit && { unit: dto.unit }),
         organization: { connect: { id: organizationId } },
       });
+
+      return this.toResponse(item);
     } catch (error) {
       this.throwIfDuplicateName(error);
       throw error;
@@ -97,7 +82,9 @@ export class InventoryItemService {
     await this.ensureExists(id, organizationId);
 
     try {
-      return await this.inventoryItemRepository.update(id, dto);
+      const item = await this.inventoryItemRepository.update(id, dto);
+
+      return this.toResponse(item);
     } catch (error) {
       this.throwIfDuplicateName(error);
       throw error;
@@ -116,6 +103,41 @@ export class InventoryItemService {
     }
 
     return context.organizationId;
+  }
+
+  private toResponse(item: {
+    createdAt: Date;
+    updatedAt: Date;
+    id: string;
+    organizationId: string;
+    name: string;
+    unit: string;
+    lots: Array<{
+      remainingQuantity: Prisma.Decimal;
+      unitCost: Prisma.Decimal;
+    }>;
+  }) {
+    const totalStock = item.lots.reduce(
+      (total, lot) => total.plus(lot.remainingQuantity),
+      new Prisma.Decimal(0),
+    );
+    const weightedCost = item.lots.reduce(
+      (total, lot) => total.plus(lot.remainingQuantity.mul(lot.unitCost)),
+      new Prisma.Decimal(0),
+    );
+
+    return {
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      id: item.id,
+      organizationId: item.organizationId,
+      name: item.name,
+      unit: item.unit,
+      totalStock: totalStock.toNumber(),
+      averageCost: totalStock.isZero()
+        ? 0
+        : weightedCost.dividedBy(totalStock).toNumber(),
+    };
   }
 
   private async ensureExists(id: string, organizationId: string) {

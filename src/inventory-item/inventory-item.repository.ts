@@ -4,6 +4,15 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
 
+const itemWithLots = {
+  lots: {
+    select: {
+      remainingQuantity: true,
+      unitCost: true,
+    },
+  },
+};
+
 @Injectable()
 export class InventoryItemRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -28,14 +37,7 @@ export class InventoryItemRepository {
         take: size,
         where,
         orderBy: sortMap[sortBy] ?? sortMap['-createdAt'],
-        include: {
-          lots: {
-            select: {
-              remainingQuantity: true,
-              unitCost: true,
-            },
-          },
-        },
+        include: itemWithLots,
       }),
       this.prisma.inventoryItem.count({ where }),
     ]);
@@ -46,6 +48,7 @@ export class InventoryItemRepository {
   findById(id: string, organizationId: string) {
     return this.prisma.inventoryItem.findFirst({
       where: { id, organizationId, isActive: true },
+      include: itemWithLots,
     });
   }
 
@@ -62,17 +65,20 @@ export class InventoryItemRepository {
         id: true,
         name: true,
         unit: true,
-        isActive: true,
       },
     });
   }
 
   create(data: Prisma.InventoryItemCreateInput) {
-    return this.prisma.inventoryItem.create({ data });
+    return this.prisma.inventoryItem.create({ data, include: itemWithLots });
   }
 
   update(id: string, data: Prisma.InventoryItemUpdateInput) {
-    return this.prisma.inventoryItem.update({ where: { id }, data });
+    return this.prisma.inventoryItem.update({
+      where: { id },
+      data,
+      include: itemWithLots,
+    });
   }
 
   delete(id: string) {
