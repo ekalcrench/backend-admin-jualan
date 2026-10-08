@@ -12,6 +12,9 @@ export class InventoryItemResponseDto extends BaseResponseDto {
   @ApiProperty({ maxLength: 255 })
   name!: string;
 
+  @ApiProperty({ default: true })
+  isActive!: boolean;
+
   @ApiProperty({ enum: InventoryUnit })
   unit!: InventoryUnit;
 }

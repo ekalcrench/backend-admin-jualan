@@ -14,8 +14,8 @@ model InventoryLot {
 
   // Relationships
   inventoryItem         InventoryItem          @relation(fields: [inventoryItemId], references: [id])
+  purchaseItem          PurchaseItem           @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
   inventoryConsumptions InventoryConsumption[]
-  purchaseItem          PurchaseItem           @relation(fields: [purchaseItemId], references: [id])
 
   @@index([inventoryItemId, receivedAt])
   @@map("inventory_lots")

@@ -66,8 +66,11 @@ export class InventoryItemService {
     return item;
   }
 
-  findOptions(search?: string) {
-    return this.inventoryItemRepository.findOptions(search);
+  findOptions(search: string | undefined, context: OrganizationContext) {
+    return this.inventoryItemRepository.findOptions(
+      this.requireOrganizationId(context),
+      search,
+    );
   }
 
   async create(dto: CreateInventoryItemDto, context: OrganizationContext) {

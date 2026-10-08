@@ -60,8 +60,11 @@ export class InventoryItemController {
   )
   @ApiOperation({ summary: 'Retrieve inventory items options by search query' })
   @ApiOkResponse({ type: InventoryItemOptionsResponseDto, isArray: true })
-  findOptions(@Query() query: GetInventoryItemOptionsDto) {
-    return this.inventoryItemService.findOptions(query.search);
+  findOptions(
+    @Query() query: GetInventoryItemOptionsDto,
+    @Req() request: Request & { user: { organizationId?: string } },
+  ) {
+    return this.inventoryItemService.findOptions(query.search, request.user);
   }
 
   @Get(':id')

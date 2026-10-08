@@ -13,6 +13,7 @@ export class InventoryItemRepository {
     const skip = (page - 1) * size;
     const where: Prisma.InventoryItemWhereInput = {
       organizationId,
+      isActive: true,
       ...(search && {
         name: {
           contains: search,
@@ -44,21 +45,24 @@ export class InventoryItemRepository {
 
   findById(id: string, organizationId: string) {
     return this.prisma.inventoryItem.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, isActive: true },
     });
   }
 
-  findOptions(search?: string) {
+  findOptions(organizationId: string, search?: string) {
     return this.prisma.inventoryItem.findMany({
-      where: search
-        ? {
-            OR: [{ name: { contains: search, mode: 'insensitive' } }],
-          }
-        : undefined,
+      where: {
+        organizationId,
+        isActive: true,
+        ...(search && {
+          name: { contains: search, mode: 'insensitive' },
+        }),
+      },
       select: {
         id: true,
         name: true,
         unit: true,
+        isActive: true,
       },
     });
   }
@@ -72,6 +76,9 @@ export class InventoryItemRepository {
   }
 
   delete(id: string) {
-    return this.prisma.inventoryItem.delete({ where: { id } });
+    return this.prisma.inventoryItem.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 }

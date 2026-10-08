@@ -2,6 +2,8 @@ import { Prisma } from '../../../prisma/generated/prisma/client.js';
 
 export const sortMap: Record<string, Prisma.PurchaseOrderByWithRelationInput> =
   {
+    invoiceNumber: { invoiceNumber: 'asc' },
+    '-invoiceNumber': { invoiceNumber: 'desc' },
     purchasedAt: { purchasedAt: 'asc' },
     '-purchasedAt': { purchasedAt: 'desc' },
     createdAt: { createdAt: 'asc' },

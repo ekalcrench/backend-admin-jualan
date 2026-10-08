@@ -10,8 +10,8 @@ model Purchase {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
-  purchaseItems PurchaseItem[]
   organization  Organization   @relation(fields: [organizationId], references: [id])
+  purchaseItems PurchaseItem[]
 
   @@unique([organizationId, supplierName, invoiceNumber])
   @@map("purchase")

@@ -61,7 +61,7 @@ export class PurchaseRepository {
 
   findInventoryItemsByIds(organizationId: string, ids: string[]) {
     return this.prisma.inventoryItem.findMany({
-      where: { organizationId, id: { in: ids } },
+      where: { organizationId, id: { in: ids }, isActive: true },
       select: { id: true },
     });
   }
