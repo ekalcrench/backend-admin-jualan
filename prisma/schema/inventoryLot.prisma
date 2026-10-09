@@ -19,5 +19,6 @@ model InventoryLot {
   inventoryConsumptions InventoryConsumption[]
 
   @@index([inventoryItemId, receivedAt])
+  @@index([purchaseItemId])
   @@map("inventory_lots")
 }

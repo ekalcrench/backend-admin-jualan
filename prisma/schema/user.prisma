@@ -18,5 +18,6 @@ model User {
   organizationApprovals OrganizationUser[]  @relation("UserApprovals")
   organizationUpdates   OrganizationUser[]  @relation("UserUpdates")
 
+  @@index([createdAt])
   @@map("users")
 }

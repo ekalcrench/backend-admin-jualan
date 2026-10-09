@@ -1,10 +1,13 @@
 enum InventoryTransactionType {
-  PURCHASE
-  SALE
+  PURCHASE // Pembelian
+  SALE // Penjualan
+
+  // Penyesuaian stock database dan actual tidak sesuai
   ADJUSTMENT_IN
   ADJUSTMENT_OUT
-  WASTE
-  RETURN
+
+  WASTE // Jika ada stok dibuang
+  RETURN // Jika ada stok return dari pembeli
 
   @@map("inventory_transaction_type")
 }

@@ -3,12 +3,9 @@ model InventoryTransaction {
   organizationId  String @map("organization_id") @db.Uuid
   inventoryItemId String @map("inventory_item_id") @db.Uuid
 
-  type InventoryTransactionType
-
-  quantity Decimal @db.Decimal(15, 3)
-
-  referenceType String? @map("reference_type")
-  referenceId   String? @map("reference_id")
+  type        InventoryTransactionType
+  quantity    Decimal                  @db.Decimal(15, 3)
+  referenceId String?                  @map("reference_id")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -17,6 +14,6 @@ model InventoryTransaction {
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
   organization  Organization  @relation(fields: [organizationId], references: [id])
 
-  @@index([inventoryItemId, createdAt])
+  @@index([organizationId, createdAt])
   @@map("inventory_transactions")
 }

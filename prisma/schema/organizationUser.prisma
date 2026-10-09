@@ -20,6 +20,6 @@ model OrganizationUser {
   approvedBy   User?        @relation("UserApprovals", fields: [approvedById], references: [id])
   updatedBy    User?        @relation("UserUpdates", fields: [updatedById], references: [id])
 
-  @@unique([userId, organizationId])
+  @@unique([organizationId, userId])
   @@map("organization_users")
 }

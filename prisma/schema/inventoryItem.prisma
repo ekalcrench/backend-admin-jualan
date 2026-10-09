@@ -16,6 +16,6 @@ model InventoryItem {
   productIngredients ProductIngredient[]
   purchaseItems      PurchaseItem[]
 
-  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
   @@map("inventory_items")
 }
