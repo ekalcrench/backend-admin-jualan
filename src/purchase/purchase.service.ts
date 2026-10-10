@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -7,8 +8,10 @@ import {
 import { Prisma } from '../../prisma/generated/prisma/client.js';
 import { CreatePurchaseDto } from './dto/create-purchase.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { UpdatePurchaseItemDto } from './dto/update-purchase-item.dto.js';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto.js';
 import { PurchaseRepository } from './purchase.repository.js';
+import { PurchaseItemChange } from './types/purchase-item-change.type.js';
 
 type OrganizationContext = { organizationId?: string };
 
@@ -105,6 +108,35 @@ export class PurchaseService {
     const organizationId = this.requireOrganizationId(context);
     await this.ensureExists(id, organizationId);
 
+    const itemChanges = dto.purchaseItems?.map((item) =>
+      this.toPurchaseItemChange(item),
+    );
+
+    const inventoryItemIds = [
+      ...new Set(
+        dto.purchaseItems
+          ?.map((item) => item.inventoryItemId)
+          .filter((inventoryItemId): inventoryItemId is string =>
+            Boolean(inventoryItemId),
+          ) ?? [],
+      ),
+    ];
+
+    // Check inventory item validation
+    if (inventoryItemIds.length) {
+      const inventoryItems =
+        await this.purchaseRepository.findInventoryItemsByIds(
+          organizationId,
+          inventoryItemIds,
+        );
+
+      if (inventoryItems.length !== inventoryItemIds.length) {
+        throw new NotFoundException(
+          'One or more inventory items were not found in this organization',
+        );
+      }
+    }
+
     const data: Prisma.PurchaseUpdateInput = {
       ...(dto.supplierName !== undefined && { supplierName: dto.supplierName }),
       ...(dto.invoiceNumber !== undefined && {
@@ -113,35 +145,105 @@ export class PurchaseService {
       ...(dto.purchasedAt !== undefined && {
         purchasedAt: new Date(dto.purchasedAt),
       }),
-      ...(dto.purchaseItems !== undefined && {
-        purchaseItems: {
-          deleteMany: {},
-          create: dto.purchaseItems.map((item) => ({
-            quantity: item.quantity,
-            totalCost: item.totalCost,
-            inventoryItem: { connect: { id: item.inventoryItemId } },
-            inventoryLot: {
-              create: {
-                inventoryItem: { connect: { id: item.inventoryItemId } },
-                quantity: item.quantity,
-                remainingQuantity: item.quantity,
-                unitCost: item.totalCost / item.quantity,
-                totalCost: item.totalCost,
-                receivedAt: new Date(item.receivedAt),
-                expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
-              },
-            },
-          })),
-        },
-      }),
     };
 
     try {
-      return this.toResponse(await this.purchaseRepository.update(id, data));
+      const purchase = await this.purchaseRepository.update(
+        id,
+        data,
+        itemChanges,
+      );
+
+      if (purchase === 'related-record-not-found') {
+        throw new NotFoundException(
+          'One or more purchase items or inventory lots were not found',
+        );
+      }
+
+      return this.toResponse(purchase);
     } catch (error) {
       this.throwIfDuplicateInvoice(error);
       throw error;
     }
+  }
+
+  private toPurchaseItemChange(
+    item: UpdatePurchaseItemDto,
+  ): PurchaseItemChange {
+    if (Boolean(item.id) !== Boolean(item.inventoryLotId)) {
+      throw new BadRequestException(
+        'Both purchase item id and inventory lot id are required when updating an item',
+      );
+    }
+
+    // If there is not id then it creates new purchase items
+    if (!item.id) {
+      const { inventoryItemId, quantity, totalCost, receivedAt, expiredAt } =
+        item;
+      if (
+        inventoryItemId === undefined ||
+        quantity === undefined ||
+        totalCost === undefined ||
+        receivedAt === undefined
+      ) {
+        throw new BadRequestException(
+          'New purchase items require inventoryItemId, quantity, totalCost, and receivedAt',
+        );
+      }
+
+      const createData = {
+        quantity,
+        totalCost,
+        inventoryItem: { connect: { id: inventoryItemId } },
+        inventoryLot: {
+          create: {
+            inventoryItem: { connect: { id: inventoryItemId } },
+            quantity,
+            remainingQuantity: quantity,
+            unitCost: totalCost / quantity,
+            totalCost,
+            receivedAt: new Date(receivedAt),
+            expiredAt: expiredAt ? new Date(expiredAt) : null,
+          },
+        },
+      } satisfies Prisma.PurchaseItemCreateWithoutPurchaseInput;
+
+      return {
+        purchaseItemData: {},
+        inventoryLotData: {},
+        createData,
+      };
+    }
+
+    // Else it updates current items
+    const purchaseItemData: Prisma.PurchaseItemUncheckedUpdateManyInput = {
+      ...(item.inventoryItemId !== undefined && {
+        inventoryItemId: item.inventoryItemId,
+      }),
+      ...(item.quantity !== undefined && { quantity: item.quantity }),
+      ...(item.totalCost !== undefined && { totalCost: item.totalCost }),
+    };
+    const inventoryLotData: Prisma.InventoryLotUpdateManyMutationInput = {
+      ...(item.quantity !== undefined && { quantity: item.quantity }),
+      ...(item.totalCost !== undefined && { totalCost: item.totalCost }),
+      ...(item.receivedAt !== undefined && {
+        receivedAt: new Date(item.receivedAt),
+      }),
+      ...(item.totalCost !== undefined &&
+        item.quantity !== undefined && {
+          unitCost: item.totalCost / item.quantity,
+        }),
+      ...(item.expiredAt !== undefined && {
+        expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
+      }),
+    };
+
+    return {
+      id: item.id,
+      inventoryLotId: item.inventoryLotId,
+      purchaseItemData,
+      inventoryLotData,
+    };
   }
 
   async delete(id: string, context: OrganizationContext) {

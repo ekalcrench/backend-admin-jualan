@@ -3,6 +3,7 @@ import { Prisma } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
+import { PurchaseItemChange } from './types/purchase-item-change.type.js';
 
 const purchaseInclude = {
   purchaseItems: {
@@ -77,11 +78,126 @@ export class PurchaseRepository {
     return this.prisma.purchase.create({ data, include: purchaseInclude });
   }
 
-  update(id: string, data: Prisma.PurchaseUpdateInput) {
-    return this.prisma.purchase.update({
-      where: { id },
-      data,
-      include: purchaseInclude,
+  update(
+    id: string,
+    data: Prisma.PurchaseUpdateInput,
+    itemChanges: PurchaseItemChange[] = [],
+  ) {
+    return this.prisma.$transaction(async (transaction) => {
+      const updateChanges = itemChanges.filter(
+        (
+          item,
+        ): item is PurchaseItemChange & {
+          id: string;
+          inventoryLotId: string;
+        } => item.id !== undefined && item.inventoryLotId !== undefined,
+      );
+      const updateItemIds = updateChanges.map((item) => item.id);
+      const updateLotIds = updateChanges.map((item) => item.inventoryLotId);
+
+      if (
+        itemChanges.some(
+          (item) =>
+            (item.id === undefined) !== (item.inventoryLotId === undefined) ||
+            (item.id === undefined && item.createData === undefined),
+        ) ||
+        new Set(updateItemIds).size !== updateItemIds.length ||
+        new Set(updateLotIds).size !== updateLotIds.length
+      ) {
+        return 'related-record-not-found' as const;
+      }
+
+      const existingItemsById = new Map<
+        string,
+        { quantity: number; totalCost: number }
+      >();
+      if (updateChanges.length) {
+        const existingItems = await transaction.purchaseItem.findMany({
+          where: {
+            purchaseId: id,
+            id: { in: updateItemIds },
+          },
+          select: {
+            id: true,
+            quantity: true,
+            totalCost: true,
+            inventoryLot: { select: { id: true } },
+          },
+        });
+        for (const item of existingItems) {
+          existingItemsById.set(item.id, {
+            quantity: item.quantity.toNumber(),
+            totalCost: item.totalCost.toNumber(),
+          });
+        }
+        const existingItemLotIds = new Map(
+          existingItems.map((item) => [item.id, item.inventoryLot?.id]),
+        );
+
+        if (
+          existingItems.length !== updateChanges.length ||
+          updateChanges.some(
+            (item) => existingItemLotIds.get(item.id) !== item.inventoryLotId,
+          )
+        ) {
+          return 'related-record-not-found' as const;
+        }
+      }
+
+      await transaction.purchase.update({
+        where: { id },
+        data,
+      });
+
+      for (const item of itemChanges) {
+        if (!item.id) {
+          await transaction.purchaseItem.create({
+            data: {
+              ...item.createData!,
+              purchase: { connect: { id } },
+            },
+          });
+          continue;
+        }
+
+        const existingItem = existingItemsById.get(item.id)!;
+
+        if (Object.keys(item.purchaseItemData).length) {
+          await transaction.purchaseItem.update({
+            where: { id: item.id },
+            data: item.purchaseItemData,
+          });
+        }
+
+        const quantity = Number(
+          item.purchaseItemData.quantity ?? existingItem.quantity,
+        );
+        const totalCost = Number(
+          item.purchaseItemData.totalCost ?? existingItem.totalCost,
+        );
+        const inventoryLotData: Prisma.InventoryLotUpdateManyMutationInput = {
+          ...item.inventoryLotData,
+          ...(item.purchaseItemData.inventoryItemId !== undefined && {
+            inventoryItemId: item.purchaseItemData.inventoryItemId,
+          }),
+          ...((item.purchaseItemData.quantity !== undefined ||
+            item.purchaseItemData.totalCost !== undefined) && {
+            unitCost: totalCost / quantity,
+          }),
+        };
+
+        if (Object.keys(inventoryLotData).length) {
+          await transaction.inventoryLot.update({
+            where: { id: item.inventoryLotId },
+            data: inventoryLotData,
+          });
+        }
+      }
+
+      return transaction.purchase.findUniqueOrThrow({
+        where: { id },
+        include: purchaseInclude,
+      });
     });
   }
 
