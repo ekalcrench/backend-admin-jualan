@@ -1,0 +1,6 @@
+enum CashTransactionType {
+  PURCHASE
+  SALE
+
+  @@map("cash_transaction_type")
+}

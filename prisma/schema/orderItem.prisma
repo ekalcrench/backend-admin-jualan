@@ -12,5 +12,6 @@ model OrderItem {
   product               Product                @relation(fields: [productId], references: [id])
   inventoryConsumptions InventoryConsumption[]
 
-  @@index([productId])
+  @@index([orderId])
+  @@map("order_items")
 }

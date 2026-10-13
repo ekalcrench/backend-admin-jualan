@@ -5,7 +5,7 @@ model InventoryTransaction {
 
   type        InventoryTransactionType
   quantity    Decimal                  @db.Decimal(15, 3)
-  referenceId String?                  @map("reference_id")
+  referenceId String?                  @map("reference_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
