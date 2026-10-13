@@ -35,11 +35,7 @@ export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
-  @OrganizationRoles(
-    OrganizationUserRole.OWNER,
-    OrganizationUserRole.ADMIN,
-    OrganizationUserRole.MEMBER,
-  )
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve products by pages' })
   @ApiOkResponse({ type: ProductGetByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
@@ -51,11 +47,7 @@ export class ProductController {
   }
 
   @Get(':id')
-  @OrganizationRoles(
-    OrganizationUserRole.OWNER,
-    OrganizationUserRole.ADMIN,
-    OrganizationUserRole.MEMBER,
-  )
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve a product by id' })
   @ApiParam({ name: 'id', description: 'Product UUID' })
   @ApiOkResponse({ type: ProductResponseDto })
@@ -68,11 +60,7 @@ export class ProductController {
   }
 
   @Post()
-  @OrganizationRoles(
-    OrganizationUserRole.OWNER,
-    OrganizationUserRole.ADMIN,
-    OrganizationUserRole.MEMBER,
-  )
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({ summary: 'Create a product and its ingredients' })
   @ApiCreatedResponse({ type: ProductResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
@@ -87,11 +75,7 @@ export class ProductController {
   }
 
   @Patch(':id')
-  @OrganizationRoles(
-    OrganizationUserRole.OWNER,
-    OrganizationUserRole.ADMIN,
-    OrganizationUserRole.MEMBER,
-  )
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
     summary:
       'Update a product and only supplied ingredient changes; omitted ingredients are unchanged',
