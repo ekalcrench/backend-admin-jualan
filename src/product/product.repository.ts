@@ -13,6 +13,11 @@ const productInclude = {
           id: true,
           name: true,
           unit: true,
+          lots: {
+            orderBy: { receivedAt: 'asc' },
+            take: 1,
+            select: { unitCost: true },
+          },
         },
       },
     },

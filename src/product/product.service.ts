@@ -226,9 +226,13 @@ export class ProductService {
       sellingPrice: product.sellingPrice.toNumber(),
       productIngredients: product.productIngredients.map((ingredient) => ({
         id: ingredient.id,
-        inventoryItemId: ingredient.inventoryItemId,
         quantity: ingredient.quantity.toNumber(),
-        inventoryItem: ingredient.inventoryItem,
+        unitCost: ingredient.inventoryItem.lots[0]?.unitCost.toNumber() ?? null,
+        inventoryItem: {
+          id: ingredient.inventoryItem.id,
+          name: ingredient.inventoryItem.name,
+          unit: ingredient.inventoryItem.unit,
+        },
       })),
     };
   }
