@@ -53,14 +53,11 @@ export class InventoryItemRepository {
     });
   }
 
-  findOptions(organizationId: string, search?: string) {
+  findOptions(organizationId: string) {
     return this.prisma.inventoryItem.findMany({
       where: {
         organizationId,
         isActive: true,
-        ...(search && {
-          name: { contains: search, mode: 'insensitive' },
-        }),
       },
       select: {
         id: true,

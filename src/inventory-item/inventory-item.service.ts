@@ -49,10 +49,9 @@ export class InventoryItemService {
     return this.toResponse(item);
   }
 
-  findOptions(search: string | undefined, context: OrganizationContext) {
+  findOptions(context: OrganizationContext) {
     return this.inventoryItemRepository.findOptions(
       this.requireOrganizationId(context),
-      search,
     );
   }
 

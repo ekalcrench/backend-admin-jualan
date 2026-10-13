@@ -10,6 +10,7 @@ import { InventoryItemModule } from './inventory-item/inventory-item.module.js';
 import { PurchaseModule } from './purchase/purchase.module.js';
 import { InitModule } from './init/init.module.js';
 import { InventoryLotModule } from './inventory-lot/inventory-lot.module.js';
+import { ProductModule } from './product/product.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { InventoryLotModule } from './inventory-lot/inventory-lot.module.js';
     InventoryItemModule,
     InventoryLotModule,
     PurchaseModule,
+    ProductModule,
     AuthModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
