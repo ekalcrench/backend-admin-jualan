@@ -14,5 +14,5 @@ model Purchase {
   purchaseItems PurchaseItem[]
 
   @@unique([organizationId, supplierName, invoiceNumber])
-  @@map("purchase")
+  @@map("purchases")
 }

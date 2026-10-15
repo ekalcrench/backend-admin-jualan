@@ -15,5 +15,5 @@ model PurchaseItem {
   inventoryLot  InventoryLot?
 
   @@index([purchaseId])
-  @@map("purchase_item")
+  @@map("purchase_items")
 }
