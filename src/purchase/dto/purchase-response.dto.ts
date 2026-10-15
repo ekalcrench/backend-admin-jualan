@@ -4,6 +4,7 @@ import {
   invoiceExample,
   supplierNameExample,
 } from '../../common/constants/api-value-example.constants.js';
+import { PurchaseStatus } from '../../../prisma/generated/prisma/client.js';
 
 class PurchaseInventoryItemDto {
   @ApiProperty({ format: 'uuid' })
@@ -65,6 +66,9 @@ export class PurchaseResponseDto extends BaseResponseDto {
 
   @ApiProperty({ format: 'uuid' })
   organizationId!: string;
+
+  @ApiProperty({ enum: PurchaseStatus })
+  status!: PurchaseStatus;
 
   @ApiProperty({ description: supplierNameExample })
   supplierName!: string;

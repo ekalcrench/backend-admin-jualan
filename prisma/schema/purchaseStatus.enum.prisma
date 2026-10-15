@@ -1,0 +1,6 @@
+enum PurchaseStatus {
+  DRAFT
+  FINALIZED
+
+  @@map("purchase_status")
+}

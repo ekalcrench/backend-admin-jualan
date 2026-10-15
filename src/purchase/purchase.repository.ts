@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../prisma/generated/prisma/client.js';
+import {
+  Prisma,
+  PurchaseStatus,
+} from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
@@ -170,7 +173,26 @@ export class PurchaseRepository {
         if (lotsToDelete.some((lot) => lot._count.inventoryConsumptions > 0)) {
           return 'consumed' as const;
         }
+      }
 
+      const purchaseUpdate = await transaction.purchase.updateMany({
+        where: { id, status: PurchaseStatus.DRAFT },
+        data: {
+          ...data,
+          status: data.status ?? PurchaseStatus.DRAFT,
+        },
+      });
+
+      if (purchaseUpdate.count === 0) {
+        const purchase = await transaction.purchase.findUnique({
+          where: { id },
+          select: { id: true },
+        });
+
+        return purchase ? ('finalized' as const) : ('not-found' as const);
+      }
+
+      if (deletedPurchaseItemIds.length) {
         await transaction.inventoryLot.deleteMany({
           where: { purchaseItemId: { in: deletedPurchaseItemIds } },
         });
@@ -181,11 +203,6 @@ export class PurchaseRepository {
           },
         });
       }
-
-      await transaction.purchase.update({
-        where: { id },
-        data,
-      });
 
       for (const item of itemChanges) {
         if (!item.id) {
@@ -243,11 +260,15 @@ export class PurchaseRepository {
     return this.prisma.$transaction(async (transaction) => {
       const purchase = await transaction.purchase.findFirst({
         where: { id, organizationId },
-        select: { purchaseItems: { select: { id: true } } },
+        select: { status: true, purchaseItems: { select: { id: true } } },
       });
 
       if (!purchase) {
         return 'not-found' as const;
+      }
+
+      if (purchase.status !== PurchaseStatus.DRAFT) {
+        return 'finalized' as const;
       }
 
       const purchaseItemIds = purchase.purchaseItems.map((item) => item.id);
@@ -263,6 +284,22 @@ export class PurchaseRepository {
 
       if (lots.some((lot) => lot._count.inventoryConsumptions > 0)) {
         return 'consumed' as const;
+      }
+
+      const draftPurchase = await transaction.purchase.updateMany({
+        where: { id, organizationId, status: PurchaseStatus.DRAFT },
+        data: { status: PurchaseStatus.DRAFT },
+      });
+
+      if (draftPurchase.count === 0) {
+        const currentPurchase = await transaction.purchase.findFirst({
+          where: { id, organizationId },
+          select: { id: true },
+        });
+
+        return currentPurchase
+          ? ('finalized' as const)
+          : ('not-found' as const);
       }
 
       if (purchaseItemIds.length) {

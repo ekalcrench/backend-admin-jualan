@@ -2,6 +2,7 @@ model Purchase {
   id             String @id @default(uuid()) @db.Uuid
   organizationId String @map("organization_id") @db.Uuid
 
+  status        PurchaseStatus @default(DRAFT)
   supplierName  String?  @map("supplier_name")
   invoiceNumber String?  @map("invoice_number")
   purchasedAt   DateTime @map("purchased_at")

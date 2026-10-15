@@ -91,6 +91,9 @@ export class PurchaseController {
   @ApiConflictResponse({
     description: 'Purchase item inventory has already been consumed',
   })
+  @ApiConflictResponse({
+    description: 'Only draft purchases can be updated',
+  })
   @ApiNotFoundResponse({ description: 'Purchase not found' })
   update(
     @Param('id') id: string,
@@ -112,6 +115,9 @@ export class PurchaseController {
   })
   @ApiConflictResponse({
     description: 'Purchase inventory has already been consumed',
+  })
+  @ApiConflictResponse({
+    description: 'Only draft purchases can be deleted',
   })
   @ApiNotFoundResponse({ description: 'Purchase not found' })
   delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {

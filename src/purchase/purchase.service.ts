@@ -5,7 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../prisma/generated/prisma/client.js';
+import {
+  Prisma,
+  PurchaseStatus,
+} from '../../prisma/generated/prisma/client.js';
 import { CreatePurchaseDto } from './dto/create-purchase.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdatePurchaseItemDto } from './dto/update-purchase-item.dto.js';
@@ -153,6 +156,7 @@ export class PurchaseService {
     }
 
     const data: Prisma.PurchaseUpdateInput = {
+      ...(dto.status !== undefined && { status: dto.status }),
       ...(dto.supplierName !== undefined && { supplierName: dto.supplierName }),
       ...(dto.invoiceNumber !== undefined && {
         invoiceNumber: dto.invoiceNumber,
@@ -170,6 +174,12 @@ export class PurchaseService {
         dto.deletedPurchaseItemIds,
       );
 
+      if (purchase === 'finalized') {
+        throw new ConflictException('Only draft purchases can be updated');
+      }
+      if (purchase === 'not-found') {
+        throw new NotFoundException('Purchase not found');
+      }
       if (purchase === 'related-record-not-found') {
         throw new NotFoundException(
           'One or more purchase items or inventory lots were not found',
@@ -277,6 +287,10 @@ export class PurchaseService {
       throw new NotFoundException('Purchase not found');
     }
 
+    if (result === 'finalized') {
+      throw new ConflictException('Only draft purchases can be deleted');
+    }
+
     if (result === 'consumed') {
       throw new ConflictException(
         'Purchase cannot be deleted because its inventory has already been consumed',
@@ -299,6 +313,10 @@ export class PurchaseService {
 
     if (!purchase) {
       throw new NotFoundException('Purchase not found');
+    }
+
+    if (purchase.status !== PurchaseStatus.DRAFT) {
+      throw new ConflictException('Only draft purchases can be updated');
     }
   }
 
