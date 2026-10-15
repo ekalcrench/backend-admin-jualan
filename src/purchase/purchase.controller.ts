@@ -81,6 +81,17 @@ export class PurchaseController {
     return this.purchaseService.create(dto, request.user);
   }
 
+  @Post(':id/finalize')
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
+  @ApiOperation({ summary: 'Finalize a draft purchase' })
+  @ApiParam({ name: 'id', description: 'Purchase UUID' })
+  @ApiOkResponse({ type: PurchaseResponseDto })
+  @ApiConflictResponse({ description: 'Only draft purchases can be finalized' })
+  @ApiNotFoundResponse({ description: 'Purchase not found' })
+  finalize(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.purchaseService.finalize(id, request.user);
+  }
+
   @Patch(':id')
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({ summary: 'Update purchase details' })

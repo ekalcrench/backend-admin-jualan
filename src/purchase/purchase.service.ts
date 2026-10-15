@@ -156,7 +156,6 @@ export class PurchaseService {
     }
 
     const data: Prisma.PurchaseUpdateInput = {
-      ...(dto.status !== undefined && { status: dto.status }),
       ...(dto.supplierName !== undefined && { supplierName: dto.supplierName }),
       ...(dto.invoiceNumber !== undefined && {
         invoiceNumber: dto.invoiceNumber,
@@ -298,6 +297,23 @@ export class PurchaseService {
     }
 
     return true;
+  }
+
+  async finalize(id: string, context: OrganizationContext) {
+    const result = await this.purchaseRepository.finalize(
+      id,
+      this.requireOrganizationId(context),
+    );
+
+    if (result === 'not-found') {
+      throw new NotFoundException('Purchase not found');
+    }
+
+    if (result === 'not-draft') {
+      throw new ConflictException('Only draft purchases can be finalized');
+    }
+
+    return this.toResponse(result);
   }
 
   private requireOrganizationId(context: OrganizationContext) {

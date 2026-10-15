@@ -81,6 +81,31 @@ export class PurchaseRepository {
     return this.prisma.purchase.create({ data, include: purchaseInclude });
   }
 
+  async finalize(id: string, organizationId: string) {
+    const result = await this.prisma.purchase.updateMany({
+      where: {
+        id,
+        organizationId,
+        status: PurchaseStatus.DRAFT,
+      },
+      data: { status: PurchaseStatus.FINALIZED },
+    });
+
+    if (result.count === 0) {
+      const purchase = await this.prisma.purchase.findFirst({
+        where: { id, organizationId },
+        select: { id: true },
+      });
+
+      return purchase ? ('not-draft' as const) : ('not-found' as const);
+    }
+
+    return this.prisma.purchase.findFirstOrThrow({
+      where: { id, organizationId },
+      include: purchaseInclude,
+    });
+  }
+
   update(
     id: string,
     data: Prisma.PurchaseUpdateInput,
@@ -177,10 +202,7 @@ export class PurchaseRepository {
 
       const purchaseUpdate = await transaction.purchase.updateMany({
         where: { id, status: PurchaseStatus.DRAFT },
-        data: {
-          ...data,
-          status: data.status ?? PurchaseStatus.DRAFT,
-        },
+        data,
       });
 
       if (purchaseUpdate.count === 0) {
