@@ -111,6 +111,21 @@ export class PurchaseService {
     const itemChanges = dto.purchaseItems?.map((item) =>
       this.toPurchaseItemChange(item),
     );
+    const updatedPurchaseItemIds = new Set(
+      dto.purchaseItems
+        ?.map((item) => item.id)
+        .filter((itemId): itemId is string => itemId !== undefined) ?? [],
+    );
+
+    if (
+      dto.deletedPurchaseItemIds?.some((itemId) =>
+        updatedPurchaseItemIds.has(itemId),
+      )
+    ) {
+      throw new BadRequestException(
+        'A purchase item cannot be updated and deleted in the same request',
+      );
+    }
 
     const inventoryItemIds = [
       ...new Set(
@@ -152,11 +167,17 @@ export class PurchaseService {
         id,
         data,
         itemChanges,
+        dto.deletedPurchaseItemIds,
       );
 
       if (purchase === 'related-record-not-found') {
         throw new NotFoundException(
           'One or more purchase items or inventory lots were not found',
+        );
+      }
+      if (purchase === 'consumed') {
+        throw new ConflictException(
+          'Purchase items cannot be deleted because their inventory has already been consumed',
         );
       }
 

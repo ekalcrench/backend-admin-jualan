@@ -88,6 +88,9 @@ export class PurchaseController {
   @ApiOkResponse({ type: PurchaseResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiConflictResponse({ description: 'Purchase invoice already exists' })
+  @ApiConflictResponse({
+    description: 'Purchase item inventory has already been consumed',
+  })
   @ApiNotFoundResponse({ description: 'Purchase not found' })
   update(
     @Param('id') id: string,

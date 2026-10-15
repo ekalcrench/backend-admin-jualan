@@ -82,6 +82,7 @@ export class PurchaseRepository {
     id: string,
     data: Prisma.PurchaseUpdateInput,
     itemChanges: PurchaseItemChange[] = [],
+    deletedPurchaseItemIds: string[] = [],
   ) {
     return this.prisma.$transaction(async (transaction) => {
       const updateChanges = itemChanges.filter(
@@ -102,7 +103,8 @@ export class PurchaseRepository {
             (item.id === undefined && item.createData === undefined),
         ) ||
         new Set(updateItemIds).size !== updateItemIds.length ||
-        new Set(updateLotIds).size !== updateLotIds.length
+        new Set(updateLotIds).size !== updateLotIds.length ||
+        deletedPurchaseItemIds.some((itemId) => updateItemIds.includes(itemId))
       ) {
         return 'related-record-not-found' as const;
       }
@@ -142,6 +144,42 @@ export class PurchaseRepository {
         ) {
           return 'related-record-not-found' as const;
         }
+      }
+
+      if (deletedPurchaseItemIds.length) {
+        const itemsToDelete = await transaction.purchaseItem.findMany({
+          where: {
+            purchaseId: id,
+            id: { in: deletedPurchaseItemIds },
+          },
+          select: { id: true },
+        });
+
+        if (itemsToDelete.length !== deletedPurchaseItemIds.length) {
+          return 'related-record-not-found' as const;
+        }
+
+        const lotsToDelete = await transaction.inventoryLot.findMany({
+          where: { purchaseItemId: { in: deletedPurchaseItemIds } },
+          select: {
+            id: true,
+            _count: { select: { inventoryConsumptions: true } },
+          },
+        });
+
+        if (lotsToDelete.some((lot) => lot._count.inventoryConsumptions > 0)) {
+          return 'consumed' as const;
+        }
+
+        await transaction.inventoryLot.deleteMany({
+          where: { purchaseItemId: { in: deletedPurchaseItemIds } },
+        });
+        await transaction.purchaseItem.deleteMany({
+          where: {
+            purchaseId: id,
+            id: { in: deletedPurchaseItemIds },
+          },
+        });
       }
 
       await transaction.purchase.update({
