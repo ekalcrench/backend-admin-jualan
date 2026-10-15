@@ -78,7 +78,7 @@ export class ProductController {
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Update a product and only supplied ingredient changes; omitted ingredients are unchanged',
+      'Update a product, supplied ingredient changes, and delete selected ingredients; omitted ingredients are unchanged',
   })
   @ApiParam({ name: 'id', description: 'Product UUID' })
   @ApiOkResponse({ type: ProductResponseDto })

@@ -95,6 +95,7 @@ export class ProductRepository {
     id: string,
     data: Prisma.ProductUpdateInput,
     productIngredients: ProductIngredientChange[] = [],
+    deletedProductIngredientIds: string[] = [],
   ) {
     return this.prisma.$transaction(async (transaction) => {
       const updates = productIngredients.filter(
@@ -103,7 +104,14 @@ export class ProductRepository {
       );
       const updateIds = updates.map((ingredient) => ingredient.id);
 
-      if (new Set(updateIds).size !== updateIds.length) {
+      if (
+        new Set(updateIds).size !== updateIds.length ||
+        new Set(deletedProductIngredientIds).size !==
+          deletedProductIngredientIds.length ||
+        deletedProductIngredientIds.some((ingredientId) =>
+          updateIds.includes(ingredientId),
+        )
+      ) {
         return 'related-record-not-found' as const;
       }
 
@@ -116,7 +124,31 @@ export class ProductRepository {
         }
       }
 
+      if (deletedProductIngredientIds.length) {
+        const ingredientsToDelete =
+          await transaction.productIngredient.findMany({
+            where: {
+              productId: id,
+              id: { in: deletedProductIngredientIds },
+            },
+            select: { id: true },
+          });
+
+        if (ingredientsToDelete.length !== deletedProductIngredientIds.length) {
+          return 'related-record-not-found' as const;
+        }
+      }
+
       await transaction.product.update({ where: { id }, data });
+
+      if (deletedProductIngredientIds.length) {
+        await transaction.productIngredient.deleteMany({
+          where: {
+            productId: id,
+            id: { in: deletedProductIngredientIds },
+          },
+        });
+      }
 
       for (const ingredient of productIngredients) {
         if (ingredient.id) {

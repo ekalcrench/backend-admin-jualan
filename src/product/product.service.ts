@@ -83,6 +83,24 @@ export class ProductService {
     const ingredientChanges = (dto.productIngredients ?? []).map((ingredient) =>
       this.toProductIngredientChange(ingredient),
     );
+    const updatedProductIngredientIds = new Set(
+      dto.productIngredients
+        ?.map((ingredient) => ingredient.id)
+        .filter(
+          (ingredientId): ingredientId is string => ingredientId !== undefined,
+        ) ?? [],
+    );
+
+    if (
+      dto.deletedProductIngredientIds?.some((ingredientId) =>
+        updatedProductIngredientIds.has(ingredientId),
+      )
+    ) {
+      throw new BadRequestException(
+        'A product ingredient cannot be updated and deleted in the same request',
+      );
+    }
+
     const inventoryItemsToValidate = (dto.productIngredients ?? [])
       .filter(
         (
@@ -113,6 +131,7 @@ export class ProductService {
         id,
         productData,
         ingredientChanges,
+        dto.deletedProductIngredientIds,
       );
       if (product === 'related-record-not-found') {
         throw new NotFoundException(
