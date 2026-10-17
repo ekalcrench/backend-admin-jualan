@@ -28,6 +28,7 @@ import { ProductGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js
 import { ProductResponseDto } from './dto/product-response.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { ProductService } from './product.service.js';
+import { ProductOptionsResponseDto } from './dto/product-options-response.dto.js';
 
 @ApiTags('products')
 @Controller('products')
@@ -44,6 +45,18 @@ export class ProductController {
     @Req() request: Request & { user: { organizationId?: string } },
   ) {
     return this.productService.findByPages(query, request.user);
+  }
+
+  @Get('options')
+  @OrganizationRoles(
+    OrganizationUserRole.OWNER,
+    OrganizationUserRole.ADMIN,
+    OrganizationUserRole.MEMBER,
+  )
+  @ApiOperation({ summary: 'Retrieve all product options' })
+  @ApiOkResponse({ type: ProductOptionsResponseDto, isArray: true })
+  findOptions(@Req() request: Request & { user: { organizationId?: string } }) {
+    return this.productService.findOptions(request.user);
   }
 
   @Get(':id')

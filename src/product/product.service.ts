@@ -12,11 +12,10 @@ import { UpdateProductIngredientDto } from './dto/update-product-ingredient.dto.
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { ProductRepository } from './product.repository.js';
 import { ProductIngredientChange } from './types/product-ingredient-change.type.js';
-
-type OrganizationContext = { organizationId?: string };
-type ProductRecord = NonNullable<
-  Awaited<ReturnType<ProductRepository['findById']>>
->;
+import { ProductOptionsResponseDto } from './dto/product-options-response.dto.js';
+import { ProductRecord } from './types/product-record.types.js';
+import { ProductOptionsRecord } from './types/product-options-record.types.js';
+import { OrganizationContext } from '../common/types/organization-context.types.js';
 
 @Injectable()
 export class ProductService {
@@ -37,6 +36,14 @@ export class ProductService {
         totalPages: Math.ceil(total / dto.size),
       },
     };
+  }
+
+  async findOptions(context: OrganizationContext) {
+    const products = await this.productRepository.findOptions(
+      this.requireOrganizationId(context),
+    );
+
+    return products.map((product) => this.toOptionsResponse(product));
   }
 
   async findById(id: string, context: OrganizationContext) {
@@ -232,6 +239,15 @@ export class ProductService {
           quantity: ingredient.quantity,
         }),
       },
+    };
+  }
+
+  private toOptionsResponse(
+    product: ProductOptionsRecord,
+  ): ProductOptionsResponseDto {
+    return {
+      ...product,
+      sellingPrice: product.sellingPrice.toNumber(),
     };
   }
 

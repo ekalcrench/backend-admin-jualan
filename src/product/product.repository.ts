@@ -53,6 +53,19 @@ export class ProductRepository {
     return { items, total };
   }
 
+  findOptions(organizationId: string) {
+    return this.prisma.product.findMany({
+      where: {
+        organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        sellingPrice: true,
+      },
+    });
+  }
+
   findById(id: string, organizationId: string) {
     return this.prisma.product.findFirst({
       where: { id, organizationId },
