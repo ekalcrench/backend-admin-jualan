@@ -11,18 +11,20 @@ import { PurchaseModule } from './purchase/purchase.module.js';
 import { InitModule } from './init/init.module.js';
 import { InventoryLotModule } from './inventory-lot/inventory-lot.module.js';
 import { ProductModule } from './product/product.module.js';
+import { OrderModule } from './order/order.module.js';
 
 @Module({
   imports: [
     PrismaModule,
-    UserModule,
-    OrganizationModule,
-    OrganizationUserModule,
+    AuthModule,
     InventoryItemModule,
     InventoryLotModule,
-    PurchaseModule,
+    UserModule,
+    OrderModule,
+    OrganizationModule,
+    OrganizationUserModule,
     ProductModule,
-    AuthModule,
+    PurchaseModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
