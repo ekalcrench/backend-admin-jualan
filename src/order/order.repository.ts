@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../prisma/generated/prisma/client.js';
+import { OrderStatus, Prisma } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
@@ -47,6 +47,28 @@ export class OrderRepository {
     return this.prisma.order.findFirst({
       where: { id, organizationId },
       include: responseInclude,
+    });
+  }
+
+  markPaid(id: string, organizationId: string) {
+    return this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.order.updateMany({
+        where: { id, organizationId, status: OrderStatus.UNPAID },
+        data: { status: OrderStatus.PAID },
+      });
+
+      if (result.count === 1) {
+        return transaction.order.findFirstOrThrow({
+          where: { id, organizationId },
+          include: responseInclude,
+        });
+      }
+
+      const order = await transaction.order.findFirst({
+        where: { id, organizationId },
+        select: { id: true },
+      });
+      return order ? ('already-paid' as const) : ('not-found' as const);
     });
   }
 
@@ -104,6 +126,7 @@ export class OrderRepository {
         data: {
           orderNumber,
           totalAmount,
+          status: OrderStatus.UNPAID,
           organization: { connect: { id: organizationId } },
           items: { create: items },
         },
@@ -122,10 +145,13 @@ export class OrderRepository {
     return this.prisma.$transaction(async (transaction) => {
       const order = await transaction.order.findFirst({
         where: { id, organizationId },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       if (!order) {
         return 'not-found' as const;
+      }
+      if (order.status === OrderStatus.PAID) {
+        return 'paid' as const;
       }
 
       const updateChanges = itemChanges.filter(
@@ -242,16 +268,25 @@ export class OrderRepository {
         ) {
           return 'consumed' as const;
         }
+      }
 
+      const orderUpdate = await transaction.order.updateMany({
+        where: { id, organizationId, status: OrderStatus.UNPAID },
+        data: { ...data, status: OrderStatus.UNPAID },
+      });
+      if (orderUpdate.count === 0) {
+        const currentOrder = await transaction.order.findFirst({
+          where: { id, organizationId },
+          select: { id: true },
+        });
+        return currentOrder ? ('paid' as const) : ('not-found' as const);
+      }
+
+      if (deletedOrderItemIds.length) {
         await transaction.orderItem.deleteMany({
           where: { orderId: id, id: { in: deletedOrderItemIds } },
         });
       }
-
-      await transaction.order.updateMany({
-        where: { id, organizationId },
-        data,
-      });
 
       for (const { item, unitPrice } of pricedChanges) {
         if (item.id) {
@@ -297,6 +332,7 @@ export class OrderRepository {
         where: { id, organizationId },
         select: {
           id: true,
+          status: true,
           items: {
             select: {
               id: true,
@@ -309,15 +345,30 @@ export class OrderRepository {
       if (!order) {
         return 'not-found' as const;
       }
+      if (order.status === OrderStatus.PAID) {
+        return 'paid' as const;
+      }
       if (order.items.some((item) => item._count.inventoryConsumptions > 0)) {
         return 'consumed' as const;
+      }
+
+      const orderUpdate = await transaction.order.updateMany({
+        where: { id, organizationId, status: OrderStatus.UNPAID },
+        data: { status: OrderStatus.UNPAID },
+      });
+      if (orderUpdate.count === 0) {
+        const currentOrder = await transaction.order.findFirst({
+          where: { id, organizationId },
+          select: { id: true },
+        });
+        return currentOrder ? ('paid' as const) : ('not-found' as const);
       }
 
       await transaction.orderItem.deleteMany({
         where: { orderId: id },
       });
       await transaction.order.delete({
-        where: { id },
+        where: { id, organizationId, status: OrderStatus.UNPAID },
       });
 
       return 'deleted' as const;

@@ -1,0 +1,6 @@
+enum OrderStatus {
+  PAID
+  UNPAID
+
+  @@map("order_status")
+}

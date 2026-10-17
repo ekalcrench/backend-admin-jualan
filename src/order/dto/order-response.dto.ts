@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
+import { OrderStatus } from '../../../prisma/generated/prisma/client.js';
 
 export class OrderItemResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -33,6 +34,9 @@ export class OrderResponseDto extends BaseResponseDto {
 
   @ApiProperty({ minimum: 0 })
   totalAmount!: number;
+
+  @ApiProperty({ enum: OrderStatus })
+  status!: OrderStatus;
 
   @ApiProperty({ type: [OrderItemResponseDto] })
   orderItems!: OrderItemResponseDto[];

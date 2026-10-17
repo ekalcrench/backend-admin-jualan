@@ -50,6 +50,22 @@ export class OrderService {
     return this.toResponse(order);
   }
 
+  async markPaid(id: string, context: OrganizationContext) {
+    const result = await this.orderRepository.markPaid(
+      id,
+      this.requireOrganizationId(context),
+    );
+
+    if (result === 'not-found') {
+      throw new NotFoundException('Order not found');
+    }
+    if (result === 'already-paid') {
+      throw new ConflictException('Order is already paid');
+    }
+
+    return this.toResponse(result);
+  }
+
   async create(dto: CreateOrderDto, context: OrganizationContext) {
     const organizationId = this.requireOrganizationId(context);
     await this.ensureProductsBelongToOrganization(
@@ -125,6 +141,9 @@ export class OrderService {
       if (order === 'not-found') {
         throw new NotFoundException('Order not found');
       }
+      if (order === 'paid') {
+        throw new ConflictException('Paid orders cannot be updated');
+      }
       if (order === 'related-record-not-found') {
         throw new NotFoundException(
           'One or more order items were not found for this order',
@@ -154,6 +173,9 @@ export class OrderService {
     );
     if (result === 'not-found') {
       throw new NotFoundException('Order not found');
+    }
+    if (result === 'paid') {
+      throw new ConflictException('Paid orders cannot be deleted');
     }
     if (result === 'consumed') {
       throw new ConflictException(
@@ -231,6 +253,7 @@ export class OrderService {
       organizationId: order.organizationId,
       orderNumber: order.orderNumber,
       totalAmount: order.totalAmount.toNumber(),
+      status: order.status,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       orderItems: order.items.map((item) => ({

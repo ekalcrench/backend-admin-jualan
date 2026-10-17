@@ -72,6 +72,17 @@ export class OrderController {
     return this.orderService.create(dto, request.user);
   }
 
+  @Post(':id/mark-paid')
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
+  @ApiOperation({ summary: 'Mark an unpaid order as paid' })
+  @ApiParam({ name: 'id', description: 'Order UUID' })
+  @ApiOkResponse({ type: OrderResponseDto })
+  @ApiConflictResponse({ description: 'Order is already paid' })
+  @ApiNotFoundResponse({ description: 'Order not found' })
+  markPaid(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.orderService.markPaid(id, request.user);
+  }
+
   @Patch(':id')
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
@@ -83,7 +94,7 @@ export class OrderController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiConflictResponse({
     description:
-      'An order item with inventory consumption cannot have its product or quantity changed',
+      'Paid orders cannot be updated; an order item with inventory consumption cannot have its product or quantity changed',
   })
   @ApiNotFoundResponse({ description: 'Order or order item not found' })
   update(
@@ -103,7 +114,8 @@ export class OrderController {
     type: Boolean,
   })
   @ApiConflictResponse({
-    description: 'An order with inventory consumption cannot be deleted',
+    description:
+      'Paid orders and orders with inventory consumption cannot be deleted',
   })
   @ApiNotFoundResponse({ description: 'Order not found' })
   delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
