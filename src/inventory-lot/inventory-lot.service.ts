@@ -2,8 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { GetInventoryLotsByPagesDto } from './dto/get-inventory-lots-by-pages.dto.js';
 import { InventoryLotRepository } from './inventory-lot.repository.js';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
-
-type OrganizationContext = { organizationId?: string };
+import { OrganizationContext } from '../common/types/organization-context.types.js';
 
 @Injectable()
 export class InventoryLotService {

@@ -15,8 +15,7 @@ import { UpdatePurchaseItemDto } from './dto/update-purchase-item.dto.js';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto.js';
 import { PurchaseRepository } from './purchase.repository.js';
 import { PurchaseItemChange } from './types/purchase-item-change.type.js';
-
-type OrganizationContext = { organizationId?: string };
+import { OrganizationContext } from '../common/types/organization-context.types.js';
 
 @Injectable()
 export class PurchaseService {

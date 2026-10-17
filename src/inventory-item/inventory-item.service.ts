@@ -9,8 +9,7 @@ import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
 import { InventoryItemRepository } from './inventory-item.repository.js';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
-
-type OrganizationContext = { organizationId?: string };
+import { OrganizationContext } from '../common/types/organization-context.types.js';
 
 @Injectable()
 export class InventoryItemService {
