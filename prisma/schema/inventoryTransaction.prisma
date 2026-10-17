@@ -13,6 +13,7 @@ model InventoryTransaction {
   // Relationships
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
   organization  Organization  @relation(fields: [organizationId], references: [id])
+  preparations  Preparation[]
 
   @@index([organizationId, createdAt])
   @@map("inventory_transactions")

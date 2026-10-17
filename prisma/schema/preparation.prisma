@@ -1,0 +1,28 @@
+model Preparation {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name       String?           @db.VarChar(255)
+  status     PreparationStatus @default(DRAFT)
+  preparedAt DateTime          @default(now()) @map("prepared_at")
+  notes      String?           @db.Text
+
+  // Hasil batch
+  outputInventoryItemId String  @map("output_inventory_item_id") @db.Uuid
+  outputQuantity        Decimal @map("output_quantity") @db.Decimal(15, 2)
+  outputUnitCost        Decimal @map("output_unit_cost") @db.Decimal(15, 3)
+  outputTotalCost       Decimal @map("output_total_cost") @db.Decimal(15, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization        Organization           @relation(fields: [organizationId], references: [id])
+  outputInventoryItem InventoryItem          @relation(fields: [outputInventoryItemId], references: [id])
+  items               PreparationItem[]
+  outputLot           InventoryLot?
+  transactions        InventoryTransaction[]
+
+  @@index([organizationId, preparedAt])
+  @@index([organizationId, status])
+  @@map("preparations")
+}

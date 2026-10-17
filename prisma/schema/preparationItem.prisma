@@ -1,0 +1,19 @@
+model PreparationItem {
+  id                   String @id @default(uuid()) @db.Uuid
+  preparationId        String @map("preparation_id") @db.Uuid
+  inventoryItemId      String @map("inventory_item_id") @db.Uuid
+  sourceInventoryLotId String @map("source_inventory_lot_id") @db.Uuid
+
+  quantity  Decimal @db.Decimal(15, 2)
+  unitCost  Decimal @map("unit_cost") @db.Decimal(15, 3)
+  totalCost Decimal @map("total_cost") @db.Decimal(15, 2)
+
+  preparation   Preparation            @relation(fields: [preparationId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem          @relation(fields: [inventoryItemId], references: [id])
+  sourceLot     InventoryLot           @relation(fields: [sourceInventoryLotId], references: [id])
+  consumptions  InventoryConsumption[]
+
+  @@index([preparationId])
+  @@index([sourceInventoryLotId])
+  @@map("preparation_items")
+}

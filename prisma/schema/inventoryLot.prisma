@@ -1,7 +1,8 @@
 model InventoryLot {
-  id              String @id @default(uuid()) @db.Uuid
-  inventoryItemId String @map("inventory_item_id") @db.Uuid
-  purchaseItemId  String @unique @map("purchase_item_id") @db.Uuid
+  id                  String  @id @default(uuid()) @db.Uuid
+  inventoryItemId     String  @map("inventory_item_id") @db.Uuid
+  purchaseItemId      String  @unique @map("purchase_item_id") @db.Uuid
+  preparationOutputId String? @unique @map("preparation_output_id") @db.Uuid
 
   quantity          Decimal @db.Decimal(15, 2)
   remainingQuantity Decimal @map("remaining_quantity") @db.Decimal(15, 2)
@@ -17,6 +18,8 @@ model InventoryLot {
   inventoryItem         InventoryItem          @relation(fields: [inventoryItemId], references: [id])
   purchaseItem          PurchaseItem           @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
   inventoryConsumptions InventoryConsumption[]
+  preparationOutput     Preparation?           @relation(fields: [preparationOutputId], references: [id])
+  preparationItems      PreparationItem[]
 
   @@index([inventoryItemId, receivedAt])
   @@index([purchaseItemId])

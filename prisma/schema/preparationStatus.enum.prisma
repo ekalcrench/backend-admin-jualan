@@ -1,0 +1,6 @@
+enum PreparationStatus {
+  DRAFT
+  COMPLETED
+
+  @@map("preparation_status")
+}

@@ -17,6 +17,7 @@ model Organization {
   orders                Order[]
   purchases             Purchase[]
   cashTransactions      CashTransaction[]
+  preparations          Preparation[]
 
   @@index([createdAt])
   @@map("organizations")
