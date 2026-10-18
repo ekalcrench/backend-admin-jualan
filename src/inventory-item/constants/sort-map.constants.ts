@@ -8,4 +8,6 @@ export const sortMap: Record<
   '-createdAt': { createdAt: 'desc' },
   name: { name: 'asc' },
   '-name': { name: 'desc' },
+  unit: { unit: 'asc' },
+  '-unit': { unit: 'desc' },
 };

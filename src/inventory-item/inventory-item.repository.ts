@@ -14,6 +14,15 @@ const itemWithLots = {
   },
 } satisfies Prisma.InventoryItemInclude;
 
+const aggregateSortExpressions = {
+  totalStock: Prisma.sql`COALESCE(SUM(lot.remaining_quantity), 0)`,
+  totalCost: Prisma.sql`COALESCE(SUM(lot.unit_cost * lot.remaining_quantity), 0)`,
+  averageCost: Prisma.sql`CASE
+    WHEN COALESCE(SUM(lot.remaining_quantity), 0) = 0 THEN 0
+    ELSE SUM(lot.unit_cost * lot.remaining_quantity) / SUM(lot.remaining_quantity)
+  END`,
+};
+
 @Injectable()
 export class InventoryItemRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -21,6 +30,7 @@ export class InventoryItemRepository {
   async findByPages(data: FindByPagesParams) {
     const { page, size, sortBy, search, organizationId } = data;
     const skip = (page - 1) * size;
+    const aggregateSort = this.getAggregateSort(sortBy);
     const where: Prisma.InventoryItemWhereInput = {
       organizationId,
       isActive: true,
@@ -31,6 +41,17 @@ export class InventoryItemRepository {
         },
       }),
     };
+
+    if (aggregateSort) {
+      return this.findByPagesWithAggregateSort({
+        size,
+        skip,
+        search,
+        organizationId,
+        where,
+        aggregateSort,
+      });
+    }
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.inventoryItem.findMany({
@@ -44,6 +65,89 @@ export class InventoryItemRepository {
     ]);
 
     return { items, total };
+  }
+
+  private async findByPagesWithAggregateSort({
+    size,
+    skip,
+    search,
+    organizationId,
+    where,
+    aggregateSort,
+  }: {
+    size: number;
+    skip: number;
+    search?: string;
+    organizationId: string;
+    where: Prisma.InventoryItemWhereInput;
+    aggregateSort: {
+      expression: Prisma.Sql;
+      direction: 'ASC' | 'DESC';
+    };
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const orderedItems = await tx.$queryRaw<Array<{ id: string }>>(
+        Prisma.sql`
+          SELECT item.id
+          FROM inventory_items AS item
+          LEFT JOIN inventory_lots AS lot
+            ON lot.inventory_item_id = item.id
+          WHERE item.organization_id = CAST(${organizationId} AS uuid)
+            AND item.is_active = true
+            ${
+              search
+                ? Prisma.sql`AND POSITION(LOWER(${search}) IN LOWER(item.name)) > 0`
+                : Prisma.empty
+            }
+          GROUP BY item.id
+          ORDER BY ${aggregateSort.expression} ${Prisma.raw(aggregateSort.direction)}, item.id ASC
+          LIMIT ${size}
+          OFFSET ${skip}
+        `,
+      );
+      const total = await tx.inventoryItem.count({ where });
+      const ids = orderedItems.map(({ id }) => id);
+      const items = ids.length
+        ? await tx.inventoryItem.findMany({
+            where: { ...where, id: { in: ids } },
+            include: itemWithLots,
+          })
+        : [];
+      const itemsById = new Map(items.map((item) => [item.id, item]));
+
+      return {
+        items: ids.flatMap((id) => {
+          const item = itemsById.get(id);
+          return item ? [item] : [];
+        }),
+        total,
+      };
+    });
+  }
+
+  private getAggregateSort(sortBy: string) {
+    const descending = sortBy.startsWith('-');
+    const field = descending ? sortBy.slice(1) : sortBy;
+
+    switch (field) {
+      case 'totalStock':
+        return {
+          expression: aggregateSortExpressions.totalStock,
+          direction: descending ? 'DESC' : 'ASC',
+        } as const;
+      case 'averageCost':
+        return {
+          expression: aggregateSortExpressions.averageCost,
+          direction: descending ? 'DESC' : 'ASC',
+        } as const;
+      case 'totalCost':
+        return {
+          expression: aggregateSortExpressions.totalCost,
+          direction: descending ? 'DESC' : 'ASC',
+        } as const;
+      default:
+        return undefined;
+    }
   }
 
   findById(id: string, organizationId: string) {
