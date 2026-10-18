@@ -1,0 +1,15 @@
+model PreparationItemLotConsumption {
+  id                String @id @default(uuid()) @db.Uuid
+  preparationItemId String @map("preparation_item_id") @db.Uuid
+  inventoryLotId    String @map("inventory_lot_id") @db.Uuid
+
+  quantity  Decimal @db.Decimal(15, 2)
+  unitCost  Decimal @map("unit_cost") @db.Decimal(15, 3)
+  totalCost Decimal @map("total_cost") @db.Decimal(15, 2)
+
+  preparationItem PreparationItem @relation(fields: [preparationItemId], references: [id], onDelete: Cascade)
+  inventoryLot    InventoryLot    @relation(fields: [inventoryLotId], references: [id])
+
+  @@index([preparationItemId])
+  @@map("preparation_item_lot_consumptions")
+}

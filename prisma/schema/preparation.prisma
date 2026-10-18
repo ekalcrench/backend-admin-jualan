@@ -23,6 +23,5 @@ model Preparation {
   transactions        InventoryTransaction[]
 
   @@index([organizationId, preparedAt])
-  @@index([organizationId, status])
   @@map("preparations")
 }

@@ -12,6 +12,7 @@ import { InitModule } from './init/init.module.js';
 import { InventoryLotModule } from './inventory-lot/inventory-lot.module.js';
 import { ProductModule } from './product/product.module.js';
 import { OrderModule } from './order/order.module.js';
+import { PreparationModule } from './preparation/preparation.module.js';
 
 @Module({
   imports: [
@@ -19,12 +20,13 @@ import { OrderModule } from './order/order.module.js';
     AuthModule,
     InventoryItemModule,
     InventoryLotModule,
-    UserModule,
     OrderModule,
     OrganizationModule,
     OrganizationUserModule,
+    PreparationModule,
     ProductModule,
     PurchaseModule,
+    UserModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
