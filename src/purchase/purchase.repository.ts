@@ -139,7 +139,11 @@ export class PurchaseRepository {
 
       const existingItemsById = new Map<
         string,
-        { quantity: number; totalCost: number }
+        {
+          quantity: number;
+          packageSize: Prisma.Decimal;
+          totalCost: Prisma.Decimal;
+        }
       >();
       if (updateChanges.length) {
         const existingItems = await transaction.purchaseItem.findMany({
@@ -150,14 +154,26 @@ export class PurchaseRepository {
           select: {
             id: true,
             quantity: true,
+            packageSize: true,
             totalCost: true,
-            inventoryLot: { select: { id: true } },
+            inventoryLot: {
+              select: {
+                id: true,
+                _count: {
+                  select: {
+                    inventoryConsumptions: true,
+                    preparationAllocations: true,
+                  },
+                },
+              },
+            },
           },
         });
         for (const item of existingItems) {
           existingItemsById.set(item.id, {
-            quantity: item.quantity.toNumber(),
-            totalCost: item.totalCost.toNumber(),
+            quantity: item.quantity,
+            packageSize: item.packageSize,
+            totalCost: item.totalCost,
           });
         }
         const existingItemLotIds = new Map(
@@ -171,6 +187,16 @@ export class PurchaseRepository {
           )
         ) {
           return 'related-record-not-found' as const;
+        }
+        if (
+          existingItems.some(
+            (item) =>
+              item.inventoryLot &&
+              (item.inventoryLot._count.inventoryConsumptions > 0 ||
+                item.inventoryLot._count.preparationAllocations > 0),
+          )
+        ) {
+          return 'consumed' as const;
         }
       }
 
@@ -191,11 +217,22 @@ export class PurchaseRepository {
           where: { purchaseItemId: { in: deletedPurchaseItemIds } },
           select: {
             id: true,
-            _count: { select: { inventoryConsumptions: true } },
+            _count: {
+              select: {
+                inventoryConsumptions: true,
+                preparationAllocations: true,
+              },
+            },
           },
         });
 
-        if (lotsToDelete.some((lot) => lot._count.inventoryConsumptions > 0)) {
+        if (
+          lotsToDelete.some(
+            (lot) =>
+              lot._count.inventoryConsumptions > 0 ||
+              lot._count.preparationAllocations > 0,
+          )
+        ) {
           return 'consumed' as const;
         }
       }
@@ -249,17 +286,27 @@ export class PurchaseRepository {
         const quantity = Number(
           item.purchaseItemData.quantity ?? existingItem.quantity,
         );
-        const totalCost = Number(
-          item.purchaseItemData.totalCost ?? existingItem.totalCost,
+        const packageSize = Number(
+          item.purchaseItemData.packageSize ?? existingItem.packageSize,
         );
+        const totalCost = new Prisma.Decimal(
+          Number(item.purchaseItemData.totalCost ?? existingItem.totalCost),
+        );
+        const totalQuantity = new Prisma.Decimal(quantity).mul(packageSize);
         const inventoryLotData: Prisma.InventoryLotUpdateManyMutationInput = {
           ...item.inventoryLotData,
+          ...((item.purchaseItemData.quantity !== undefined ||
+            item.purchaseItemData.packageSize !== undefined) && {
+            quantity: totalQuantity,
+            remainingQuantity: totalQuantity,
+          }),
           ...(item.purchaseItemData.inventoryItemId !== undefined && {
             inventoryItemId: item.purchaseItemData.inventoryItemId,
           }),
           ...((item.purchaseItemData.quantity !== undefined ||
+            item.purchaseItemData.packageSize !== undefined ||
             item.purchaseItemData.totalCost !== undefined) && {
-            unitCost: totalCost / quantity,
+            unitCost: totalCost.div(totalQuantity),
           }),
         };
 
@@ -299,12 +346,23 @@ export class PurchaseRepository {
             where: { purchaseItemId: { in: purchaseItemIds } },
             select: {
               id: true,
-              _count: { select: { inventoryConsumptions: true } },
+              _count: {
+                select: {
+                  inventoryConsumptions: true,
+                  preparationAllocations: true,
+                },
+              },
             },
           })
         : [];
 
-      if (lots.some((lot) => lot._count.inventoryConsumptions > 0)) {
+      if (
+        lots.some(
+          (lot) =>
+            lot._count.inventoryConsumptions > 0 ||
+            lot._count.preparationAllocations > 0,
+        )
+      ) {
         return 'consumed' as const;
       }
 

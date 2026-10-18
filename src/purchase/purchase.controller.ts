@@ -100,7 +100,8 @@ export class PurchaseController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiConflictResponse({ description: 'Purchase invoice already exists' })
   @ApiConflictResponse({
-    description: 'Purchase item inventory has already been consumed',
+    description:
+      'Purchase items cannot be updated or deleted after their inventory has been consumed',
   })
   @ApiConflictResponse({
     description: 'Only draft purchases can be updated',

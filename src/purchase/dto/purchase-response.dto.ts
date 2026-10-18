@@ -47,8 +47,13 @@ class PurchaseItemResponseDto {
   @ApiProperty({ format: 'uuid' })
   inventoryItemId!: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Number of packages purchased' })
   quantity!: number;
+
+  @ApiProperty({
+    description: 'Inventory units contained in each package',
+  })
+  packageSize!: number;
 
   @ApiProperty()
   totalCost!: number;

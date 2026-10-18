@@ -76,22 +76,31 @@ export class PurchaseService {
         purchasedAt: new Date(dto.purchasedAt),
         organization: { connect: { id: organizationId } },
         purchaseItems: {
-          create: dto.purchaseItems.map((item) => ({
-            quantity: item.quantity,
-            totalCost: item.totalCost,
-            inventoryItem: { connect: { id: item.inventoryItemId } },
-            inventoryLot: {
-              create: {
-                inventoryItem: { connect: { id: item.inventoryItemId } },
-                quantity: item.quantity,
-                remainingQuantity: item.quantity,
-                unitCost: item.totalCost / item.quantity,
-                totalCost: item.totalCost,
-                receivedAt: new Date(item.receivedAt),
-                expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
+          create: dto.purchaseItems.map((item) => {
+            const totalQuantity = new Prisma.Decimal(item.quantity).mul(
+              item.packageSize,
+            );
+
+            return {
+              quantity: item.quantity,
+              packageSize: item.packageSize,
+              totalCost: item.totalCost,
+              inventoryItem: { connect: { id: item.inventoryItemId } },
+              inventoryLot: {
+                create: {
+                  inventoryItem: { connect: { id: item.inventoryItemId } },
+                  quantity: totalQuantity,
+                  remainingQuantity: totalQuantity,
+                  unitCost: new Prisma.Decimal(item.totalCost).div(
+                    totalQuantity,
+                  ),
+                  totalCost: item.totalCost,
+                  receivedAt: new Date(item.receivedAt),
+                  expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
+                },
               },
-            },
-          })),
+            };
+          }),
         },
       });
 
@@ -185,7 +194,7 @@ export class PurchaseService {
       }
       if (purchase === 'consumed') {
         throw new ConflictException(
-          'Purchase items cannot be deleted because their inventory has already been consumed',
+          'Purchase items cannot be updated or deleted because their inventory has already been consumed',
         );
       }
 
@@ -207,29 +216,38 @@ export class PurchaseService {
 
     // If there is not id then it creates new purchase items
     if (!item.id) {
-      const { inventoryItemId, quantity, totalCost, receivedAt, expiredAt } =
-        item;
+      const {
+        inventoryItemId,
+        quantity,
+        packageSize,
+        totalCost,
+        receivedAt,
+        expiredAt,
+      } = item;
       if (
         inventoryItemId === undefined ||
         quantity === undefined ||
+        packageSize === undefined ||
         totalCost === undefined ||
         receivedAt === undefined
       ) {
         throw new BadRequestException(
-          'New purchase items require inventoryItemId, quantity, totalCost, and receivedAt',
+          'New purchase items require inventoryItemId, quantity, packageSize, totalCost, and receivedAt',
         );
       }
 
+      const totalQuantity = new Prisma.Decimal(quantity).mul(packageSize);
       const createData = {
         quantity,
+        packageSize,
         totalCost,
         inventoryItem: { connect: { id: inventoryItemId } },
         inventoryLot: {
           create: {
             inventoryItem: { connect: { id: inventoryItemId } },
-            quantity,
-            remainingQuantity: quantity,
-            unitCost: totalCost / quantity,
+            quantity: totalQuantity,
+            remainingQuantity: totalQuantity,
+            unitCost: new Prisma.Decimal(totalCost).div(totalQuantity),
             totalCost,
             receivedAt: new Date(receivedAt),
             expiredAt: expiredAt ? new Date(expiredAt) : null,
@@ -250,18 +268,16 @@ export class PurchaseService {
         inventoryItemId: item.inventoryItemId,
       }),
       ...(item.quantity !== undefined && { quantity: item.quantity }),
+      ...(item.packageSize !== undefined && {
+        packageSize: item.packageSize,
+      }),
       ...(item.totalCost !== undefined && { totalCost: item.totalCost }),
     };
     const inventoryLotData: Prisma.InventoryLotUpdateManyMutationInput = {
-      ...(item.quantity !== undefined && { quantity: item.quantity }),
       ...(item.totalCost !== undefined && { totalCost: item.totalCost }),
       ...(item.receivedAt !== undefined && {
         receivedAt: new Date(item.receivedAt),
       }),
-      ...(item.totalCost !== undefined &&
-        item.quantity !== undefined && {
-          unitCost: item.totalCost / item.quantity,
-        }),
       ...(item.expiredAt !== undefined && {
         expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
       }),
@@ -351,7 +367,8 @@ export class PurchaseService {
       purchaseItems: Array<{
         id: string;
         inventoryItemId: string;
-        quantity: Prisma.Decimal;
+        quantity: number;
+        packageSize: Prisma.Decimal;
         totalCost: Prisma.Decimal;
         inventoryItem: { id: string; name: string; unit: string };
         inventoryLot: {
@@ -371,7 +388,8 @@ export class PurchaseService {
       purchaseItems: purchase.purchaseItems.map((item) => ({
         id: item.id,
         inventoryItemId: item.inventoryItemId,
-        quantity: item.quantity.toNumber(),
+        quantity: item.quantity,
+        packageSize: item.packageSize.toNumber(),
         totalCost: item.totalCost.toNumber(),
         inventoryItem: item.inventoryItem,
         inventoryLot: item.inventoryLot

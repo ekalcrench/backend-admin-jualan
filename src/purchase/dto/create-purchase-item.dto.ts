@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsInt,
   IsNumber,
   IsOptional,
   IsUUID,
@@ -13,13 +14,27 @@ export class CreatePurchaseItemDto {
   @IsUUID()
   inventoryItemId!: string;
 
-  @ApiProperty({ minimum: 0.01, example: 5 })
+  @ApiProperty({
+    description: 'Number of packages purchased',
+    minimum: 1,
+    example: 6,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+
+  @ApiProperty({
+    description: 'Inventory units contained in each package',
+    minimum: 0.01,
+    example: 1000,
+  })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
-  quantity!: number;
+  packageSize!: number;
 
-  @ApiProperty({ minimum: 0, example: 12.5 })
+  @ApiProperty({ minimum: 0, example: 20000 })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
