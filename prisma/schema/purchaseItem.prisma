@@ -3,9 +3,11 @@ model PurchaseItem {
   purchaseId      String @map("purchase_id") @db.Uuid
   inventoryItemId String @map("inventory_item_id") @db.Uuid
 
-  quantity    Int     @default(0)
-  packageSize Decimal @map("package_size") @db.Decimal(15, 2)
-  totalCost   Decimal @map("total_cost") @db.Decimal(15, 2)
+  quantity    Int       @default(0)
+  packageSize Decimal   @map("package_size") @db.Decimal(15, 2)
+  totalCost   Decimal   @map("total_cost") @db.Decimal(15, 2)
+  receivedAt  DateTime  @map("received_at")
+  expiredAt   DateTime? @map("expired_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

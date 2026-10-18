@@ -77,28 +77,13 @@ export class PurchaseService {
         organization: { connect: { id: organizationId } },
         purchaseItems: {
           create: dto.purchaseItems.map((item) => {
-            const totalQuantity = new Prisma.Decimal(item.quantity).mul(
-              item.packageSize,
-            );
-
             return {
               quantity: item.quantity,
               packageSize: item.packageSize,
               totalCost: item.totalCost,
+              receivedAt: new Date(item.receivedAt),
+              expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
               inventoryItem: { connect: { id: item.inventoryItemId } },
-              inventoryLot: {
-                create: {
-                  inventoryItem: { connect: { id: item.inventoryItemId } },
-                  quantity: totalQuantity,
-                  remainingQuantity: totalQuantity,
-                  unitCost: new Prisma.Decimal(item.totalCost).div(
-                    totalQuantity,
-                  ),
-                  totalCost: item.totalCost,
-                  receivedAt: new Date(item.receivedAt),
-                  expiredAt: item.expiredAt ? new Date(item.expiredAt) : null,
-                },
-              },
             };
           }),
         },
@@ -197,6 +182,11 @@ export class PurchaseService {
           'Purchase items cannot be updated or deleted because their inventory has already been consumed',
         );
       }
+      if (purchase === 'inventory-lots-exist') {
+        throw new ConflictException(
+          'Purchase items cannot be deleted because inventory lots have already been recorded',
+        );
+      }
 
       return this.toResponse(purchase);
     } catch (error) {
@@ -208,12 +198,6 @@ export class PurchaseService {
   private toPurchaseItemChange(
     item: UpdatePurchaseItemDto,
   ): PurchaseItemChange {
-    if (Boolean(item.id) !== Boolean(item.inventoryLotId)) {
-      throw new BadRequestException(
-        'Both purchase item id and inventory lot id are required when updating an item',
-      );
-    }
-
     // If there is not id then it creates new purchase items
     if (!item.id) {
       const {
@@ -236,28 +220,17 @@ export class PurchaseService {
         );
       }
 
-      const totalQuantity = new Prisma.Decimal(quantity).mul(packageSize);
       const createData = {
         quantity,
         packageSize,
         totalCost,
+        receivedAt: new Date(receivedAt),
+        expiredAt: expiredAt ? new Date(expiredAt) : null,
         inventoryItem: { connect: { id: inventoryItemId } },
-        inventoryLot: {
-          create: {
-            inventoryItem: { connect: { id: inventoryItemId } },
-            quantity: totalQuantity,
-            remainingQuantity: totalQuantity,
-            unitCost: new Prisma.Decimal(totalCost).div(totalQuantity),
-            totalCost,
-            receivedAt: new Date(receivedAt),
-            expiredAt: expiredAt ? new Date(expiredAt) : null,
-          },
-        },
       } satisfies Prisma.PurchaseItemCreateWithoutPurchaseInput;
 
       return {
         purchaseItemData: {},
-        inventoryLotData: {},
         createData,
       };
     }
@@ -272,9 +245,6 @@ export class PurchaseService {
         packageSize: item.packageSize,
       }),
       ...(item.totalCost !== undefined && { totalCost: item.totalCost }),
-    };
-    const inventoryLotData: Prisma.InventoryLotUpdateManyMutationInput = {
-      ...(item.totalCost !== undefined && { totalCost: item.totalCost }),
       ...(item.receivedAt !== undefined && {
         receivedAt: new Date(item.receivedAt),
       }),
@@ -285,9 +255,7 @@ export class PurchaseService {
 
     return {
       id: item.id,
-      inventoryLotId: item.inventoryLotId,
       purchaseItemData,
-      inventoryLotData,
     };
   }
 
@@ -308,6 +276,12 @@ export class PurchaseService {
     if (result === 'consumed') {
       throw new ConflictException(
         'Purchase cannot be deleted because its inventory has already been consumed',
+      );
+    }
+
+    if (result === 'inventory-lots-exist') {
+      throw new ConflictException(
+        'Purchase cannot be deleted because inventory lots have already been recorded',
       );
     }
 
@@ -370,6 +344,8 @@ export class PurchaseService {
         quantity: number;
         packageSize: Prisma.Decimal;
         totalCost: Prisma.Decimal;
+        receivedAt: Date;
+        expiredAt: Date | null;
         inventoryItem: { id: string; name: string; unit: string };
         inventoryLot: {
           id: string;
@@ -391,6 +367,8 @@ export class PurchaseService {
         quantity: item.quantity,
         packageSize: item.packageSize.toNumber(),
         totalCost: item.totalCost.toNumber(),
+        receivedAt: item.receivedAt,
+        expiredAt: item.expiredAt,
         inventoryItem: item.inventoryItem,
         inventoryLot: item.inventoryLot
           ? {

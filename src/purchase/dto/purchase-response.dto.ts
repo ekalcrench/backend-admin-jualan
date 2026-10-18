@@ -58,6 +58,12 @@ class PurchaseItemResponseDto {
   @ApiProperty()
   totalCost!: number;
 
+  @ApiProperty({ type: String, format: 'date-time' })
+  receivedAt!: Date;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  expiredAt!: Date | null;
+
   @ApiProperty({ type: PurchaseInventoryItemDto })
   inventoryItem!: PurchaseInventoryItemDto;
 

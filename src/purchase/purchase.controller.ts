@@ -70,9 +70,7 @@ export class PurchaseController {
 
   @Post()
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
-  @ApiOperation({
-    summary: 'Create a purchase and receive its inventory items',
-  })
+  @ApiOperation({ summary: 'Create a draft purchase' })
   @ApiCreatedResponse({ type: PurchaseResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiConflictResponse({ description: 'Purchase invoice already exists' })
@@ -104,6 +102,10 @@ export class PurchaseController {
       'Purchase items cannot be updated or deleted after their inventory has been consumed',
   })
   @ApiConflictResponse({
+    description:
+      'Purchase items with already recorded inventory lots cannot be deleted',
+  })
+  @ApiConflictResponse({
     description: 'Only draft purchases can be updated',
   })
   @ApiNotFoundResponse({ description: 'Purchase not found' })
@@ -117,9 +119,7 @@ export class PurchaseController {
 
   @Delete(':id')
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
-  @ApiOperation({
-    summary: 'Delete a purchase and its unconsumed inventory lots',
-  })
+  @ApiOperation({ summary: 'Delete a draft purchase' })
   @ApiParam({ name: 'id', description: 'Purchase UUID' })
   @ApiOkResponse({
     description: 'Purchase deleted successfully',
@@ -127,6 +127,9 @@ export class PurchaseController {
   })
   @ApiConflictResponse({
     description: 'Purchase inventory has already been consumed',
+  })
+  @ApiConflictResponse({
+    description: 'Purchase inventory is already recorded and cannot be removed',
   })
   @ApiConflictResponse({
     description: 'Only draft purchases can be deleted',

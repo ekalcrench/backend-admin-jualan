@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  InventoryTransactionType,
   Prisma,
   PurchaseStatus,
 } from '../../prisma/generated/prisma/client.js';
@@ -7,21 +8,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
 import { PurchaseItemChange } from './types/purchase-item-change.type.js';
-
-const purchaseInclude = {
-  purchaseItems: {
-    include: {
-      inventoryItem: {
-        select: {
-          id: true,
-          name: true,
-          unit: true,
-        },
-      },
-      inventoryLot: true,
-    },
-  },
-} satisfies Prisma.PurchaseInclude;
+import { responseInclude } from './constants/response-include.constants.js';
 
 @Injectable()
 export class PurchaseRepository {
@@ -55,7 +42,7 @@ export class PurchaseRepository {
         take: size,
         where,
         orderBy: sortMap[sortBy] ?? sortMap['-purchasedAt'],
-        include: purchaseInclude,
+        include: responseInclude,
       }),
       this.prisma.purchase.count({ where }),
     ]);
@@ -73,36 +60,89 @@ export class PurchaseRepository {
   findById(id: string, organizationId: string) {
     return this.prisma.purchase.findFirst({
       where: { id, organizationId },
-      include: purchaseInclude,
+      include: responseInclude,
     });
   }
 
   create(data: Prisma.PurchaseCreateInput) {
-    return this.prisma.purchase.create({ data, include: purchaseInclude });
+    return this.prisma.purchase.create({ data, include: responseInclude });
   }
 
   async finalize(id: string, organizationId: string) {
-    const result = await this.prisma.purchase.updateMany({
-      where: {
-        id,
-        organizationId,
-        status: PurchaseStatus.DRAFT,
-      },
-      data: { status: PurchaseStatus.FINALIZED },
-    });
-
-    if (result.count === 0) {
-      const purchase = await this.prisma.purchase.findFirst({
-        where: { id, organizationId },
-        select: { id: true },
+    return this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.purchase.updateMany({
+        where: {
+          id,
+          organizationId,
+          status: PurchaseStatus.DRAFT,
+        },
+        data: { status: PurchaseStatus.FINALIZED },
       });
 
-      return purchase ? ('not-draft' as const) : ('not-found' as const);
-    }
+      if (result.count === 0) {
+        const purchase = await transaction.purchase.findFirst({
+          where: { id, organizationId },
+          select: { id: true },
+        });
 
-    return this.prisma.purchase.findFirstOrThrow({
-      where: { id, organizationId },
-      include: purchaseInclude,
+        return purchase ? ('not-draft' as const) : ('not-found' as const);
+      }
+
+      const purchase = await transaction.purchase.findFirstOrThrow({
+        where: { id, organizationId },
+        select: {
+          id: true,
+          organizationId: true,
+          purchaseItems: {
+            select: {
+              id: true,
+              inventoryItemId: true,
+              quantity: true,
+              packageSize: true,
+              totalCost: true,
+              receivedAt: true,
+              expiredAt: true,
+              inventoryLot: { select: { id: true } },
+            },
+          },
+        },
+      });
+
+      for (const item of purchase.purchaseItems) {
+        const totalQuantity = item.packageSize.mul(item.quantity);
+
+        if (!item.inventoryLot) {
+          await transaction.inventoryLot.create({
+            data: {
+              inventoryItemId: item.inventoryItemId,
+              purchaseItemId: item.id,
+              quantity: totalQuantity,
+              remainingQuantity: totalQuantity,
+              unitCost: item.totalCost.div(totalQuantity),
+              totalCost: item.totalCost,
+              receivedAt: item.receivedAt,
+              expiredAt: item.expiredAt,
+            },
+          });
+        }
+      }
+
+      if (purchase.purchaseItems.length) {
+        await transaction.inventoryTransaction.createMany({
+          data: purchase.purchaseItems.map((item) => ({
+            organizationId: purchase.organizationId,
+            inventoryItemId: item.inventoryItemId,
+            type: InventoryTransactionType.PURCHASE,
+            quantity: item.packageSize.mul(item.quantity),
+            referenceId: purchase.id,
+          })),
+        });
+      }
+
+      return transaction.purchase.findFirstOrThrow({
+        where: { id, organizationId },
+        include: responseInclude,
+      });
     });
   }
 
@@ -114,37 +154,21 @@ export class PurchaseRepository {
   ) {
     return this.prisma.$transaction(async (transaction) => {
       const updateChanges = itemChanges.filter(
-        (
-          item,
-        ): item is PurchaseItemChange & {
-          id: string;
-          inventoryLotId: string;
-        } => item.id !== undefined && item.inventoryLotId !== undefined,
+        (item): item is PurchaseItemChange & { id: string } =>
+          item.id !== undefined,
       );
       const updateItemIds = updateChanges.map((item) => item.id);
-      const updateLotIds = updateChanges.map((item) => item.inventoryLotId);
 
       if (
         itemChanges.some(
-          (item) =>
-            (item.id === undefined) !== (item.inventoryLotId === undefined) ||
-            (item.id === undefined && item.createData === undefined),
+          (item) => item.id === undefined && item.createData === undefined,
         ) ||
         new Set(updateItemIds).size !== updateItemIds.length ||
-        new Set(updateLotIds).size !== updateLotIds.length ||
         deletedPurchaseItemIds.some((itemId) => updateItemIds.includes(itemId))
       ) {
         return 'related-record-not-found' as const;
       }
 
-      const existingItemsById = new Map<
-        string,
-        {
-          quantity: number;
-          packageSize: Prisma.Decimal;
-          totalCost: Prisma.Decimal;
-        }
-      >();
       if (updateChanges.length) {
         const existingItems = await transaction.purchaseItem.findMany({
           where: {
@@ -153,9 +177,6 @@ export class PurchaseRepository {
           },
           select: {
             id: true,
-            quantity: true,
-            packageSize: true,
-            totalCost: true,
             inventoryLot: {
               select: {
                 id: true,
@@ -169,23 +190,8 @@ export class PurchaseRepository {
             },
           },
         });
-        for (const item of existingItems) {
-          existingItemsById.set(item.id, {
-            quantity: item.quantity,
-            packageSize: item.packageSize,
-            totalCost: item.totalCost,
-          });
-        }
-        const existingItemLotIds = new Map(
-          existingItems.map((item) => [item.id, item.inventoryLot?.id]),
-        );
 
-        if (
-          existingItems.length !== updateChanges.length ||
-          updateChanges.some(
-            (item) => existingItemLotIds.get(item.id) !== item.inventoryLotId,
-          )
-        ) {
+        if (existingItems.length !== updateChanges.length) {
           return 'related-record-not-found' as const;
         }
         if (
@@ -216,7 +222,6 @@ export class PurchaseRepository {
         const lotsToDelete = await transaction.inventoryLot.findMany({
           where: { purchaseItemId: { in: deletedPurchaseItemIds } },
           select: {
-            id: true,
             _count: {
               select: {
                 inventoryConsumptions: true,
@@ -235,6 +240,9 @@ export class PurchaseRepository {
         ) {
           return 'consumed' as const;
         }
+        if (lotsToDelete.length > 0) {
+          return 'inventory-lots-exist' as const;
+        }
       }
 
       const purchaseUpdate = await transaction.purchase.updateMany({
@@ -252,9 +260,6 @@ export class PurchaseRepository {
       }
 
       if (deletedPurchaseItemIds.length) {
-        await transaction.inventoryLot.deleteMany({
-          where: { purchaseItemId: { in: deletedPurchaseItemIds } },
-        });
         await transaction.purchaseItem.deleteMany({
           where: {
             purchaseId: id,
@@ -274,53 +279,17 @@ export class PurchaseRepository {
           continue;
         }
 
-        const existingItem = existingItemsById.get(item.id)!;
-
         if (Object.keys(item.purchaseItemData).length) {
           await transaction.purchaseItem.update({
             where: { id: item.id },
             data: item.purchaseItemData,
           });
         }
-
-        const quantity = Number(
-          item.purchaseItemData.quantity ?? existingItem.quantity,
-        );
-        const packageSize = Number(
-          item.purchaseItemData.packageSize ?? existingItem.packageSize,
-        );
-        const totalCost = new Prisma.Decimal(
-          Number(item.purchaseItemData.totalCost ?? existingItem.totalCost),
-        );
-        const totalQuantity = new Prisma.Decimal(quantity).mul(packageSize);
-        const inventoryLotData: Prisma.InventoryLotUpdateManyMutationInput = {
-          ...item.inventoryLotData,
-          ...((item.purchaseItemData.quantity !== undefined ||
-            item.purchaseItemData.packageSize !== undefined) && {
-            quantity: totalQuantity,
-            remainingQuantity: totalQuantity,
-          }),
-          ...(item.purchaseItemData.inventoryItemId !== undefined && {
-            inventoryItemId: item.purchaseItemData.inventoryItemId,
-          }),
-          ...((item.purchaseItemData.quantity !== undefined ||
-            item.purchaseItemData.packageSize !== undefined ||
-            item.purchaseItemData.totalCost !== undefined) && {
-            unitCost: totalCost.div(totalQuantity),
-          }),
-        };
-
-        if (Object.keys(inventoryLotData).length) {
-          await transaction.inventoryLot.update({
-            where: { id: item.inventoryLotId },
-            data: inventoryLotData,
-          });
-        }
       }
 
       return transaction.purchase.findUniqueOrThrow({
         where: { id },
-        include: purchaseInclude,
+        include: responseInclude,
       });
     });
   }
@@ -366,6 +335,10 @@ export class PurchaseRepository {
         return 'consumed' as const;
       }
 
+      if (lots.length > 0) {
+        return 'inventory-lots-exist' as const;
+      }
+
       const draftPurchase = await transaction.purchase.updateMany({
         where: { id, organizationId, status: PurchaseStatus.DRAFT },
         data: { status: PurchaseStatus.DRAFT },
@@ -380,12 +353,6 @@ export class PurchaseRepository {
         return currentPurchase
           ? ('finalized' as const)
           : ('not-found' as const);
-      }
-
-      if (purchaseItemIds.length) {
-        await transaction.inventoryLot.deleteMany({
-          where: { purchaseItemId: { in: purchaseItemIds } },
-        });
       }
 
       await transaction.purchase.delete({ where: { id } });

@@ -16,7 +16,11 @@ export class UpdatePurchaseItemDto {
   @IsUUID()
   id?: string;
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    deprecated: true,
+    description: 'No longer required; retained for backward compatibility.',
+  })
   @IsOptional()
   @IsUUID()
   inventoryLotId?: string;
@@ -74,5 +78,5 @@ export class UpdatePurchaseItemDto {
   @ApiPropertyOptional({ format: 'date-time', nullable: true })
   @IsOptional()
   @IsDateString()
-  expiredAt?: string | null;
+  expiredAt?: string;
 }
