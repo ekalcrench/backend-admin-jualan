@@ -13,6 +13,7 @@ import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -30,7 +31,10 @@ import { UpdatePurchaseDto } from './dto/update-purchase.dto.js';
 import { PurchaseService } from './purchase.service.js';
 
 type AuthenticatedRequest = Request & {
-  user: { organizationId?: string };
+  user: {
+    organizationId?: string;
+    organization_roles?: OrganizationUserRole[];
+  };
 };
 
 @ApiTags('purchases')
@@ -119,7 +123,7 @@ export class PurchaseController {
 
   @Delete(':id')
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
-  @ApiOperation({ summary: 'Delete a draft purchase' })
+  @ApiOperation({ summary: 'Delete a purchase' })
   @ApiParam({ name: 'id', description: 'Purchase UUID' })
   @ApiOkResponse({
     description: 'Purchase deleted successfully',
@@ -129,13 +133,19 @@ export class PurchaseController {
     description: 'Purchase inventory has already been consumed',
   })
   @ApiConflictResponse({
-    description: 'Purchase inventory is already recorded and cannot be removed',
+    description: 'Purchase inventory is referenced by preparation records',
   })
   @ApiConflictResponse({
-    description: 'Only draft purchases can be deleted',
+    description: 'Purchase status changed while deletion was in progress',
+  })
+  @ApiForbiddenResponse({
+    description: 'Only an organization owner can delete a finalized purchase',
   })
   @ApiNotFoundResponse({ description: 'Purchase not found' })
   delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.purchaseService.delete(id, request.user);
+    return this.purchaseService.delete(id, {
+      organizationId: request.user.organizationId,
+      organizationRoles: request.user.organization_roles,
+    });
   }
 }

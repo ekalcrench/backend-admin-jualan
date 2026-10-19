@@ -16,6 +16,7 @@ import { UpdatePurchaseDto } from './dto/update-purchase.dto.js';
 import { PurchaseRepository } from './purchase.repository.js';
 import { PurchaseItemChange } from './types/purchase-item-change.type.js';
 import { OrganizationContext } from '../common/types/organization-context.types.js';
+import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 
 @Injectable()
 export class PurchaseService {
@@ -263,14 +264,17 @@ export class PurchaseService {
     const result = await this.purchaseRepository.delete(
       id,
       this.requireOrganizationId(context),
+      context.organizationRoles?.includes(OrganizationUserRole.OWNER) ?? false,
     );
 
     if (result === 'not-found') {
       throw new NotFoundException('Purchase not found');
     }
 
-    if (result === 'finalized') {
-      throw new ConflictException('Only draft purchases can be deleted');
+    if (result === 'forbidden') {
+      throw new ForbiddenException(
+        'Only an organization owner can delete a finalized purchase',
+      );
     }
 
     if (result === 'consumed') {
@@ -279,9 +283,15 @@ export class PurchaseService {
       );
     }
 
-    if (result === 'inventory-lots-exist') {
+    if (result === 'preparation-records-exist') {
       throw new ConflictException(
-        'Purchase cannot be deleted because inventory lots have already been recorded',
+        'Purchase cannot be deleted because its inventory is referenced by preparation records',
+      );
+    }
+
+    if (result === 'status-changed') {
+      throw new ConflictException(
+        'Purchase status changed while deletion was in progress; retry the request',
       );
     }
 

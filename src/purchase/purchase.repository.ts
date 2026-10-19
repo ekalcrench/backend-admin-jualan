@@ -294,7 +294,7 @@ export class PurchaseRepository {
     });
   }
 
-  delete(id: string, organizationId: string) {
+  delete(id: string, organizationId: string, isOwner: boolean) {
     return this.prisma.$transaction(async (transaction) => {
       const purchase = await transaction.purchase.findFirst({
         where: { id, organizationId },
@@ -305,8 +305,29 @@ export class PurchaseRepository {
         return 'not-found' as const;
       }
 
-      if (purchase.status !== PurchaseStatus.DRAFT) {
-        return 'finalized' as const;
+      if (purchase.status === PurchaseStatus.FINALIZED && !isOwner) {
+        return 'forbidden' as const;
+      }
+
+      const deleteGuard = await transaction.purchase.updateMany({
+        where: { id, organizationId, status: purchase.status },
+        data: { status: purchase.status },
+      });
+
+      if (deleteGuard.count === 0) {
+        const currentPurchase = await transaction.purchase.findFirst({
+          where: { id, organizationId },
+          select: { status: true },
+        });
+
+        if (!currentPurchase) {
+          return 'not-found' as const;
+        }
+        if (currentPurchase.status === PurchaseStatus.FINALIZED && !isOwner) {
+          return 'forbidden' as const;
+        }
+
+        return 'status-changed' as const;
       }
 
       const purchaseItemIds = purchase.purchaseItems.map((item) => item.id);
@@ -319,40 +340,39 @@ export class PurchaseRepository {
                 select: {
                   inventoryConsumptions: true,
                   preparationAllocations: true,
+                  preparationItems: true,
                 },
               },
             },
           })
         : [];
 
-      if (
-        lots.some(
-          (lot) =>
-            lot._count.inventoryConsumptions > 0 ||
-            lot._count.preparationAllocations > 0,
-        )
-      ) {
+      if (lots.some((lot) => lot._count.inventoryConsumptions > 0)) {
         return 'consumed' as const;
       }
 
-      if (lots.length > 0) {
-        return 'inventory-lots-exist' as const;
+      if (
+        lots.some(
+          (lot) =>
+            lot._count.preparationAllocations > 0 ||
+            lot._count.preparationItems > 0,
+        )
+      ) {
+        return 'preparation-records-exist' as const;
       }
 
-      const draftPurchase = await transaction.purchase.updateMany({
-        where: { id, organizationId, status: PurchaseStatus.DRAFT },
-        data: { status: PurchaseStatus.DRAFT },
+      await transaction.inventoryTransaction.deleteMany({
+        where: {
+          organizationId,
+          referenceId: id,
+          type: InventoryTransactionType.PURCHASE,
+        },
       });
 
-      if (draftPurchase.count === 0) {
-        const currentPurchase = await transaction.purchase.findFirst({
-          where: { id, organizationId },
-          select: { id: true },
+      if (purchaseItemIds.length) {
+        await transaction.inventoryLot.deleteMany({
+          where: { purchaseItemId: { in: purchaseItemIds } },
         });
-
-        return currentPurchase
-          ? ('finalized' as const)
-          : ('not-found' as const);
       }
 
       await transaction.purchase.delete({ where: { id } });
