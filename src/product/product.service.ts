@@ -26,9 +26,19 @@ export class ProductService {
       ...dto,
       organizationId: this.requireOrganizationId(context),
     });
+    const remainingStockByInventoryItemId =
+      await this.getRemainingStockByInventoryItemIds(
+        items.flatMap((product) =>
+          product.productIngredients.map(
+            (ingredient) => ingredient.inventoryItemId,
+          ),
+        ),
+      );
 
     return {
-      items: items.map((product) => this.toResponse(product)),
+      items: items.map((product) =>
+        this.toResponse(product, remainingStockByInventoryItemId),
+      ),
       pagination: {
         page: dto.page,
         size: dto.size,
@@ -42,8 +52,18 @@ export class ProductService {
     const products = await this.productRepository.findOptions(
       this.requireOrganizationId(context),
     );
+    const remainingStockByInventoryItemId =
+      await this.getRemainingStockByInventoryItemIds(
+        products.flatMap((product) =>
+          product.productIngredients.map(
+            (ingredient) => ingredient.inventoryItemId,
+          ),
+        ),
+      );
 
-    return products.map((product) => this.toOptionsResponse(product));
+    return products.map((product) =>
+      this.toOptionsResponse(product, remainingStockByInventoryItemId),
+    );
   }
 
   async findById(id: string, context: OrganizationContext) {
@@ -56,7 +76,13 @@ export class ProductService {
       throw new NotFoundException('Product not found');
     }
 
-    return this.toResponse(product);
+    const remainingStockByInventoryItemId =
+      await this.getRemainingStockByInventoryItemIds(
+        product.productIngredients.map(
+          (ingredient) => ingredient.inventoryItemId,
+        ),
+      );
+    return this.toResponse(product, remainingStockByInventoryItemId);
   }
 
   async create(dto: CreateProductDto, context: OrganizationContext) {
@@ -72,7 +98,13 @@ export class ProductService {
         { name: dto.name, sellingPrice: dto.sellingPrice },
         dto.productIngredients,
       );
-      return this.toResponse(product);
+      const remainingStockByInventoryItemId =
+        await this.getRemainingStockByInventoryItemIds(
+          product.productIngredients.map(
+            (ingredient) => ingredient.inventoryItemId,
+          ),
+        );
+      return this.toResponse(product, remainingStockByInventoryItemId);
     } catch (error) {
       this.throwIfDuplicateName(error);
       throw error;
@@ -145,7 +177,13 @@ export class ProductService {
           'One or more product ingredients were not found for this product',
         );
       }
-      return this.toResponse(product);
+      const remainingStockByInventoryItemId =
+        await this.getRemainingStockByInventoryItemIds(
+          product.productIngredients.map(
+            (ingredient) => ingredient.inventoryItemId,
+          ),
+        );
+      return this.toResponse(product, remainingStockByInventoryItemId);
     } catch (error) {
       this.throwIfDuplicateName(error);
       throw error;
@@ -244,14 +282,23 @@ export class ProductService {
 
   private toOptionsResponse(
     product: ProductOptionsRecord,
+    remainingStockByInventoryItemId: Map<string, Prisma.Decimal>,
   ): ProductOptionsResponseDto {
     return {
-      ...product,
+      id: product.id,
+      name: product.name,
       sellingPrice: product.sellingPrice.toNumber(),
+      stock: this.calculateStock(
+        product.productIngredients,
+        remainingStockByInventoryItemId,
+      ),
     };
   }
 
-  private toResponse(product: ProductRecord) {
+  private toResponse(
+    product: ProductRecord,
+    remainingStockByInventoryItemId: Map<string, Prisma.Decimal>,
+  ) {
     return {
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
@@ -259,6 +306,10 @@ export class ProductService {
       organizationId: product.organizationId,
       name: product.name,
       sellingPrice: product.sellingPrice.toNumber(),
+      stock: this.calculateStock(
+        product.productIngredients,
+        remainingStockByInventoryItemId,
+      ),
       productIngredients: product.productIngredients.map((ingredient) => ({
         id: ingredient.id,
         quantity: ingredient.quantity.toNumber(),
@@ -270,6 +321,48 @@ export class ProductService {
         },
       })),
     };
+  }
+
+  private async getRemainingStockByInventoryItemIds(ids: string[]) {
+    const uniqueIds = [...new Set(ids)];
+    const inventoryLots =
+      await this.productRepository.findRemainingStockByInventoryItemIds(
+        uniqueIds,
+      );
+
+    return new Map<string, Prisma.Decimal>(
+      inventoryLots.map(
+        (lot) =>
+          [
+            lot.inventoryItemId,
+            lot._sum.remainingQuantity ?? new Prisma.Decimal(0),
+          ] as [string, Prisma.Decimal],
+      ),
+    );
+  }
+
+  private calculateStock(
+    ingredients: Array<{
+      inventoryItemId: string;
+      quantity: Prisma.Decimal;
+    }>,
+    remainingStockByInventoryItemId: Map<string, Prisma.Decimal>,
+  ) {
+    if (!ingredients.length) {
+      return 0;
+    }
+
+    return Math.min(
+      ...ingredients.map((ingredient) =>
+        (
+          remainingStockByInventoryItemId.get(ingredient.inventoryItemId) ??
+          new Prisma.Decimal(0)
+        )
+          .div(ingredient.quantity)
+          .floor()
+          .toNumber(),
+      ),
+    );
   }
 
   private throwIfDuplicateName(error: unknown): void {

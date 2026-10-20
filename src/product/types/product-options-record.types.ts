@@ -4,4 +4,8 @@ export type ProductOptionsRecord = {
   id: string;
   name: string;
   sellingPrice: Decimal;
+  productIngredients: Array<{
+    inventoryItemId: string;
+    quantity: Decimal;
+  }>;
 };

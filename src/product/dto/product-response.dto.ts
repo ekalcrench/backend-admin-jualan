@@ -45,6 +45,13 @@ export class ProductResponseDto extends BaseResponseDto {
   @ApiProperty({ minimum: 0 })
   sellingPrice!: number;
 
+  @ApiProperty({
+    example: 7,
+    minimum: 0,
+    description: 'Maximum whole products that can be made with current stock',
+  })
+  stock!: number;
+
   @ApiProperty({ type: [ProductIngredientResponseDto] })
   productIngredients!: ProductIngredientResponseDto[];
 }

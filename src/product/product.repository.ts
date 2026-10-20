@@ -4,26 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
 import { ProductIngredientChange } from './types/product-ingredient-change.type.js';
-
-const productInclude = {
-  productIngredients: {
-    include: {
-      inventoryItem: {
-        select: {
-          id: true,
-          name: true,
-          unit: true,
-          lots: {
-            orderBy: { receivedAt: 'asc' },
-            take: 1,
-            select: { unitCost: true },
-          },
-        },
-      },
-    },
-    orderBy: { createdAt: 'asc' },
-  },
-} satisfies Prisma.ProductInclude;
+import { productInclude } from './constants/response-include.constants.js';
 
 @Injectable()
 export class ProductRepository {
@@ -62,7 +43,25 @@ export class ProductRepository {
         id: true,
         name: true,
         sellingPrice: true,
+        productIngredients: {
+          select: {
+            inventoryItemId: true,
+            quantity: true,
+          },
+        },
       },
+    });
+  }
+
+  findRemainingStockByInventoryItemIds(ids: string[]) {
+    if (!ids.length) {
+      return [];
+    }
+
+    return this.prisma.inventoryLot.groupBy({
+      by: ['inventoryItemId'],
+      where: { inventoryItemId: { in: ids } },
+      _sum: { remainingQuantity: true },
     });
   }
 
