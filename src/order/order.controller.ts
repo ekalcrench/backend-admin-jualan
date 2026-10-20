@@ -60,10 +60,13 @@ export class OrderController {
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Create an order using current product selling prices for its items',
+      'Create an unpaid order using current product selling prices and reserve its ingredients from inventory',
   })
   @ApiCreatedResponse({ type: OrderResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
+  @ApiConflictResponse({
+    description: 'Insufficient inventory for order items',
+  })
   @ApiConflictResponse({
     description: 'An order with this number already exists',
   })
@@ -87,14 +90,14 @@ export class OrderController {
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Update order details and items using current product selling prices; use deletedOrderItemIds to remove selected items',
+      'Update an unpaid order and rebuild its inventory reservations; use deletedOrderItemIds to remove selected items',
   })
   @ApiParam({ name: 'id', description: 'Order UUID' })
   @ApiOkResponse({ type: OrderResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiConflictResponse({
     description:
-      'Paid orders cannot be updated; an order item with inventory consumption cannot have its product or quantity changed',
+      'Paid orders cannot be updated; inventory must be available for all order items',
   })
   @ApiNotFoundResponse({ description: 'Order or order item not found' })
   update(
@@ -107,15 +110,16 @@ export class OrderController {
 
   @Delete(':id')
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
-  @ApiOperation({ summary: 'Delete an order and its order items' })
+  @ApiOperation({
+    summary: 'Delete an unpaid order and release its inventory reservations',
+  })
   @ApiParam({ name: 'id', description: 'Order UUID' })
   @ApiOkResponse({
     description: 'Order and its order items deleted successfully',
     type: Boolean,
   })
   @ApiConflictResponse({
-    description:
-      'Paid orders and orders with inventory consumption cannot be deleted',
+    description: 'Paid orders cannot be deleted',
   })
   @ApiNotFoundResponse({ description: 'Order not found' })
   delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {

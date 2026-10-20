@@ -10,7 +10,10 @@ import { CreateOrderDto } from './dto/create-order.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto.js';
 import { UpdateOrderDto } from './dto/update-order.dto.js';
-import { OrderRepository } from './order.repository.js';
+import {
+  InsufficientOrderInventoryError,
+  OrderRepository,
+} from './order.repository.js';
 import { OrderItemChange } from './types/order-item-change.type.js';
 import { OrganizationContext } from '../common/types/organization-context.types.js';
 import { ProductByIdRecord } from './types/product-by-id-record-types.js';
@@ -86,6 +89,7 @@ export class OrderService {
       }
       return this.toResponse(order);
     } catch (error) {
+      this.throwIfInsufficientInventory(error);
       this.throwIfDuplicateOrderNumber(error);
       throw error;
     }
@@ -154,13 +158,9 @@ export class OrderService {
           'One or more products were not found in this organization',
         );
       }
-      if (order === 'consumed') {
-        throw new ConflictException(
-          'Order items with inventory consumption cannot have their product or quantity changed or be deleted',
-        );
-      }
       return this.toResponse(order);
     } catch (error) {
+      this.throwIfInsufficientInventory(error);
       this.throwIfDuplicateOrderNumber(error);
       throw error;
     }
@@ -177,12 +177,6 @@ export class OrderService {
     if (result === 'paid') {
       throw new ConflictException('Paid orders cannot be deleted');
     }
-    if (result === 'consumed') {
-      throw new ConflictException(
-        'An order with inventory consumption cannot be deleted',
-      );
-    }
-
     return true;
   }
 
@@ -273,6 +267,12 @@ export class OrderService {
       throw new ConflictException(
         'An order with this number already exists in this organization',
       );
+    }
+  }
+
+  private throwIfInsufficientInventory(error: unknown): void {
+    if (error instanceof InsufficientOrderInventoryError) {
+      throw new ConflictException(error.message);
     }
   }
 }
