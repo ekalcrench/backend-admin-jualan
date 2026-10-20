@@ -278,15 +278,11 @@ export class PurchaseService {
     }
 
     if (result === 'consumed') {
-      throw new ConflictException(
-        'Purchase cannot be deleted because its inventory has already been consumed',
-      );
+      throw new ConflictException('Bahan sudah digunakan');
     }
 
     if (result === 'preparation-records-exist') {
-      throw new ConflictException(
-        'Purchase cannot be deleted because its inventory is referenced by preparation records',
-      );
+      throw new ConflictException('Bahan sudah digunakan');
     }
 
     if (result === 'status-changed') {

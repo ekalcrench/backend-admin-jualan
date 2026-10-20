@@ -340,7 +340,6 @@ export class PurchaseRepository {
                 select: {
                   inventoryConsumptions: true,
                   preparationAllocations: true,
-                  preparationItems: true,
                 },
               },
             },
@@ -351,13 +350,7 @@ export class PurchaseRepository {
         return 'consumed' as const;
       }
 
-      if (
-        lots.some(
-          (lot) =>
-            lot._count.preparationAllocations > 0 ||
-            lot._count.preparationItems > 0,
-        )
-      ) {
+      if (lots.some((lot) => lot._count.preparationAllocations > 0)) {
         return 'preparation-records-exist' as const;
       }
 
