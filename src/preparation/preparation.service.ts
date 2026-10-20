@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
+import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 import { OrganizationContext } from '../common/types/organization-context.types.js';
 import { CreatePreparationDto } from './dto/create-preparation.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
@@ -61,6 +62,7 @@ export class PreparationService {
       {
         name: dto.name,
         preparedAt: new Date(dto.preparedAt),
+        expiredAt: dto.expiredAt ? new Date(dto.expiredAt) : null,
         notes: dto.notes,
         outputInventoryItemId: dto.outputInventoryItemId,
         outputQuantity: new Prisma.Decimal(dto.outputQuantity),
@@ -68,9 +70,7 @@ export class PreparationService {
       dto.preparationItems,
     );
     if (preparation === 'insufficient-stock') {
-      throw new ConflictException(
-        'There is not enough remaining inventory to complete this preparation',
-      );
+      throw new ConflictException('Stock bahan tidak mencukupi');
     }
 
     return this.toResponse(preparation);
@@ -103,6 +103,9 @@ export class PreparationService {
         ...(dto.preparedAt !== undefined && {
           preparedAt: new Date(dto.preparedAt),
         }),
+        ...(dto.expiredAt !== undefined && {
+          expiredAt: dto.expiredAt ? new Date(dto.expiredAt) : null,
+        }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
         ...(dto.outputInventoryItemId !== undefined && {
           outputInventoryItemId: dto.outputInventoryItemId,
@@ -124,8 +127,43 @@ export class PreparationService {
       );
     }
     if (preparation === 'insufficient-stock') {
+      throw new ConflictException('Stock bahan tidak mencukupi');
+    }
+    if (preparation === 'output-consumed') {
       throw new ConflictException(
-        'There is not enough remaining inventory to complete this preparation',
+        'A preparation cannot be changed while its output inventory has been consumed',
+      );
+    }
+    if (preparation === 'empty-preparation') {
+      throw new BadRequestException(
+        'A preparation must contain at least one preparation item',
+      );
+    }
+    if (preparation === 'not-draft') {
+      throw new ConflictException('Only draft preparations can be updated');
+    }
+
+    return this.toResponse(preparation);
+  }
+
+  async complete(id: string, context: OrganizationContext) {
+    const preparation = await this.preparationRepository.complete(
+      id,
+      this.requireOrganizationId(context),
+    );
+
+    if (preparation === 'not-found') {
+      throw new NotFoundException('Preparation not found');
+    }
+    if (preparation === 'not-draft') {
+      throw new ConflictException('Only draft preparations can be completed');
+    }
+    if (preparation === 'insufficient-stock') {
+      throw new ConflictException('Stock bahan tidak mencukupi');
+    }
+    if (preparation === 'related-record-not-found') {
+      throw new NotFoundException(
+        'One or more preparation items were not found for this preparation',
       );
     }
     if (preparation === 'output-consumed') {
@@ -146,6 +184,7 @@ export class PreparationService {
     const result = await this.preparationRepository.delete(
       id,
       this.requireOrganizationId(context),
+      context.organizationRoles?.includes(OrganizationUserRole.OWNER) ?? false,
     );
     if (result === 'not-found') {
       throw new NotFoundException('Preparation not found');
@@ -153,6 +192,11 @@ export class PreparationService {
     if (result === 'output-consumed') {
       throw new ConflictException(
         'A preparation cannot be deleted while its output inventory has been consumed',
+      );
+    }
+    if (result === 'forbidden') {
+      throw new ForbiddenException(
+        'Only an organization owner can delete a completed preparation',
       );
     }
     return true;

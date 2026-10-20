@@ -2,6 +2,10 @@ enum InventoryTransactionType {
   PURCHASE // Pembelian
   SALE // Penjualan
 
+  // Penyesuaian stock jika preparations
+  PREPARATION_IN
+  PREPARATION_OUT
+
   // Penyesuaian stock database dan actual tidak sesuai
   ADJUSTMENT_IN
   ADJUSTMENT_OUT

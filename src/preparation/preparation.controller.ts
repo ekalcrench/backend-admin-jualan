@@ -13,6 +13,7 @@ import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -58,8 +59,7 @@ export class PreparationController {
   @Post()
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
-    summary:
-      'Create a preparation, consume available inventory lots, and create its output lot',
+    summary: 'Create a draft preparation and reserve its ingredient inventory',
   })
   @ApiCreatedResponse({ type: PreparationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
@@ -81,14 +81,14 @@ export class PreparationController {
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Update a preparation and its items; use deletedPreparationItemIds to remove items',
+      'Update a draft preparation; use deletedPreparationItemIds to remove items',
   })
   @ApiParam({ name: 'id', description: 'Preparation UUID' })
   @ApiOkResponse({ type: PreparationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiConflictResponse({
     description:
-      'Insufficient inventory or the preparation output has already been consumed',
+      'Insufficient inventory, the preparation output has already been consumed, or the preparation is completed',
   })
   @ApiNotFoundResponse({
     description: 'Preparation or one of its related records was not found',
@@ -99,6 +99,22 @@ export class PreparationController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.preparationService.update(id, dto, request.user);
+  }
+
+  @Post(':id/complete')
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Complete a draft preparation and create its output lot',
+  })
+  @ApiParam({ name: 'id', description: 'Preparation UUID' })
+  @ApiOkResponse({ type: PreparationResponseDto })
+  @ApiConflictResponse({
+    description:
+      'Only draft preparations can be completed, or there is not enough ingredient inventory',
+  })
+  @ApiNotFoundResponse({ description: 'Preparation not found' })
+  complete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.preparationService.complete(id, request.user);
   }
 
   @Delete(':id')
@@ -112,8 +128,15 @@ export class PreparationController {
   @ApiConflictResponse({
     description: 'Preparation output has already been consumed',
   })
+  @ApiForbiddenResponse({
+    description:
+      'Only an organization owner can delete a completed preparation',
+  })
   @ApiNotFoundResponse({ description: 'Preparation not found' })
   delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.preparationService.delete(id, request.user);
+    return this.preparationService.delete(id, {
+      organizationId: request.user.organizationId,
+      organizationRoles: request.user.organization_roles,
+    });
   }
 }

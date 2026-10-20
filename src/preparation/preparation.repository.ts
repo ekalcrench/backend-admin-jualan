@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../prisma/generated/prisma/client.js';
+import {
+  InventoryTransactionType,
+  PreparationStatus,
+  Prisma,
+} from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
@@ -21,7 +25,9 @@ type PreparationItemInput = CreatePreparationItemDto & { id?: string };
 
 type PreparationValues = {
   name?: string;
+  status?: PreparationStatus;
   preparedAt?: Date;
+  expiredAt?: Date | null;
   notes?: string;
   outputInventoryItemId?: string;
   outputQuantity?: Prisma.Decimal;
@@ -135,6 +141,7 @@ export class PreparationRepository {
               organizationId,
               name: values.name,
               preparedAt: values.preparedAt,
+              expiredAt: values.expiredAt,
               notes: values.notes,
               outputInventoryItemId: values.outputInventoryItemId,
               outputQuantity: values.outputQuantity,
@@ -148,19 +155,6 @@ export class PreparationRepository {
             preparation.id,
             plannedItems,
           );
-          await transaction.inventoryLot.create({
-            data: {
-              inventoryItemId: values.outputInventoryItemId,
-              purchaseItemId: null,
-              preparationOutputId: preparation.id,
-              quantity: values.outputQuantity,
-              remainingQuantity: values.outputQuantity,
-              unitCost: costs.unitCost,
-              totalCost: costs.totalCost,
-              receivedAt: values.preparedAt,
-            },
-          });
-
           return transaction.preparation.findFirstOrThrow({
             where: { id: preparation.id, organizationId },
             include: preparationInclude,
@@ -200,6 +194,9 @@ export class PreparationRepository {
           if (!preparation) {
             return 'not-found' as const;
           }
+          if (preparation.status !== PreparationStatus.DRAFT) {
+            return 'not-draft' as const;
+          }
 
           const existingItemsById = new Map(
             preparation.items.map((item) => [item.id, item]),
@@ -230,13 +227,25 @@ export class PreparationRepository {
           );
           const requestedPreparedAt =
             values.preparedAt ?? preparation.preparedAt;
+          const requestedExpiredAt =
+            values.expiredAt === undefined
+              ? preparation.expiredAt
+              : values.expiredAt;
+          const requestedStatus = values.status ?? preparation.status;
+          const isCompleting =
+            preparation.status === PreparationStatus.DRAFT &&
+            requestedStatus === PreparationStatus.COMPLETED;
           const hasItemChanges =
             changes.length > 0 || deletedPreparationItemIds.length > 0;
           const outputLotNeedsUpdate =
+            isCompleting ||
             hasItemChanges ||
             requestedOutputItemId !== preparation.outputInventoryItemId ||
             !requestedOutputQuantity.equals(preparation.outputQuantity) ||
-            requestedPreparedAt.getTime() !== preparation.preparedAt.getTime();
+            requestedPreparedAt.getTime() !==
+              preparation.preparedAt.getTime() ||
+            (requestedExpiredAt?.getTime() ?? null) !==
+              (preparation.expiredAt?.getTime() ?? null);
 
           if (
             outputLotNeedsUpdate &&
@@ -343,7 +352,10 @@ export class PreparationRepository {
             },
           });
 
-          if (outputLotNeedsUpdate) {
+          if (
+            requestedStatus === PreparationStatus.COMPLETED &&
+            (outputLotNeedsUpdate || !preparation.outputLot)
+          ) {
             if (preparation.outputLot) {
               await transaction.inventoryLot.update({
                 where: { id: preparation.outputLot.id },
@@ -354,6 +366,7 @@ export class PreparationRepository {
                   unitCost: costs.unitCost,
                   totalCost: costs.totalCost,
                   receivedAt: requestedPreparedAt,
+                  expiredAt: requestedExpiredAt,
                 },
               });
             } else {
@@ -367,7 +380,28 @@ export class PreparationRepository {
                   unitCost: costs.unitCost,
                   totalCost: costs.totalCost,
                   receivedAt: requestedPreparedAt,
+                  expiredAt: requestedExpiredAt,
                 },
+              });
+            }
+            if (isCompleting) {
+              await transaction.inventoryTransaction.createMany({
+                data: [
+                  {
+                    organizationId,
+                    inventoryItemId: requestedOutputItemId,
+                    type: InventoryTransactionType.PREPARATION_IN,
+                    quantity: requestedOutputQuantity,
+                    referenceId: id,
+                  },
+                  ...preparation.items.map((item) => ({
+                    organizationId,
+                    inventoryItemId: item.inventoryItemId,
+                    type: InventoryTransactionType.PREPARATION_OUT,
+                    quantity: item.quantity,
+                    referenceId: id,
+                  })),
+                ],
               });
             }
           }
@@ -382,7 +416,13 @@ export class PreparationRepository {
     );
   }
 
-  delete(id: string, organizationId: string) {
+  complete(id: string, organizationId: string) {
+    return this.update(id, organizationId, {
+      status: PreparationStatus.COMPLETED,
+    });
+  }
+
+  delete(id: string, organizationId: string, isOwner: boolean) {
     return this.prisma.$transaction(
       async (transaction) => {
         const preparation = await transaction.preparation.findFirst({
@@ -404,6 +444,9 @@ export class PreparationRepository {
         if (!preparation) {
           return 'not-found' as const;
         }
+        if (preparation.status === PreparationStatus.COMPLETED && !isOwner) {
+          return 'forbidden' as const;
+        }
         if (
           preparation.outputLot &&
           (preparation.outputLot.remainingQuantity.lessThan(
@@ -423,6 +466,18 @@ export class PreparationRepository {
             });
           }
         }
+        await transaction.inventoryTransaction.deleteMany({
+          where: {
+            organizationId,
+            referenceId: id,
+            type: {
+              in: [
+                InventoryTransactionType.PREPARATION_IN,
+                InventoryTransactionType.PREPARATION_OUT,
+              ],
+            },
+          },
+        });
         if (preparation.outputLot) {
           await transaction.inventoryLot.delete({
             where: { id: preparation.outputLot.id },
@@ -556,7 +611,6 @@ export class PreparationRepository {
           ...(item.id && { id: item.id }),
           preparationId,
           inventoryItemId: item.inventoryItemId,
-          sourceInventoryLotId: firstLotId,
           quantity: item.quantity,
           unitCost: item.unitCost,
           totalCost: item.totalCost,
@@ -574,19 +628,22 @@ export class PreparationRepository {
   }
 
   private calculateOutputCosts(
-    items: Array<{ unitCost: Prisma.Decimal }>,
+    items: Array<{ totalCost: Prisma.Decimal }>,
     outputQuantity: Prisma.Decimal,
   ) {
-    const unitCost = roundCost(
+    const totalCost = roundCost(
       items.reduce(
-        (sum, item) => sum.plus(item.unitCost),
+        (sum, item) => sum.plus(item.totalCost),
         new Prisma.Decimal(0),
       ),
-      3,
+      2,
     );
+    const unitCost = totalCost
+      .div(outputQuantity)
+      .toDecimalPlaces(3, Prisma.Decimal.ROUND_DOWN);
     return {
       unitCost,
-      totalCost: roundCost(unitCost.mul(outputQuantity), 2),
+      totalCost,
     };
   }
 

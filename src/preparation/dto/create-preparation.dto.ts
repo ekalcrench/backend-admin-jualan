@@ -24,6 +24,11 @@ export class CreatePreparationDto {
   @IsDateString()
   preparedAt!: string;
 
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  @IsOptional()
+  @IsDateString()
+  expiredAt?: string | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -33,8 +38,7 @@ export class CreatePreparationDto {
   @IsUUID()
   outputInventoryItemId!: string;
 
-  @ApiProperty({ type: String, example: '500.00', minimum: 0.01 })
-  @Type(() => Number)
+  @ApiProperty({ example: 500 })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
   outputQuantity!: number;

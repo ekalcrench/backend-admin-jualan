@@ -58,7 +58,7 @@ export class PreparationResponseDto extends BaseResponseDto {
   organizationId!: string;
 
   @ApiProperty()
-  name!: string | null;
+  name!: string;
 
   @ApiProperty({ enum: PreparationStatus })
   status!: PreparationStatus;
@@ -66,8 +66,11 @@ export class PreparationResponseDto extends BaseResponseDto {
   @ApiProperty({ type: String, format: 'date-time' })
   preparedAt!: Date;
 
-  @ApiPropertyOptional({ nullable: true })
-  notes!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  expiredAt!: Date | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  notes?: string;
 
   @ApiProperty({ format: 'uuid' })
   outputInventoryItemId!: string;

@@ -15,11 +15,10 @@ model InventoryLot {
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
   // Relationships
-  inventoryItem         InventoryItem          @relation(fields: [inventoryItemId], references: [id])
-  purchaseItem          PurchaseItem?          @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
-  inventoryConsumptions InventoryConsumption[]
-  preparationOutput     Preparation?           @relation(fields: [preparationOutputId], references: [id])
-  preparationItems      PreparationItem[]
+  inventoryItem          InventoryItem                   @relation(fields: [inventoryItemId], references: [id])
+  purchaseItem           PurchaseItem?                   @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
+  inventoryConsumptions  InventoryConsumption[]
+  preparationOutput      Preparation?                    @relation(fields: [preparationOutputId], references: [id])
   preparationAllocations PreparationItemLotConsumption[]
 
   @@index([inventoryItemId, receivedAt])
