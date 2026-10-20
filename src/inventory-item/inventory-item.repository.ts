@@ -58,7 +58,7 @@ export class InventoryItemRepository {
         skip,
         take: size,
         where,
-        orderBy: sortMap[sortBy] ?? sortMap['-createdAt'],
+        orderBy: sortMap[sortBy] ?? sortMap['name'],
         include: itemWithLots,
       }),
       this.prisma.inventoryItem.count({ where }),
@@ -168,6 +168,7 @@ export class InventoryItemRepository {
         name: true,
         unit: true,
       },
+      orderBy: { name: 'asc' },
     });
   }
 
