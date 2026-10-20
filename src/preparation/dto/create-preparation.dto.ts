@@ -29,10 +29,14 @@ export class CreatePreparationDto {
   @IsDateString()
   expiredAt?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    example: 'Cara buat telur dadar',
+  })
   @IsOptional()
   @IsString()
-  notes?: string;
+  notes?: string | null;
 
   @ApiProperty({ format: 'uuid' })
   @IsUUID()

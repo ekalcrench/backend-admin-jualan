@@ -8,5 +8,6 @@ import { InventoryItemService } from './inventory-item.service.js';
   imports: [PrismaModule],
   controllers: [InventoryItemController],
   providers: [InventoryItemRepository, InventoryItemService],
+  exports: [InventoryItemService],
 })
 export class InventoryItemModule {}

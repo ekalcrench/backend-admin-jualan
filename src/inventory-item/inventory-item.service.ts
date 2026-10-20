@@ -37,8 +37,8 @@ export class InventoryItemService {
 
   async findById(id: string, context: OrganizationContext) {
     const item = await this.inventoryItemRepository.findById(
-      id,
       this.requireOrganizationId(context),
+      id,
     );
 
     if (!item) {
@@ -95,6 +95,22 @@ export class InventoryItemService {
     return true;
   }
 
+  async ensureInventoryItemsBelongToOrganization(
+    inventoryItemIds: string[],
+    organizationId: string,
+  ) {
+    const ids = [...new Set(inventoryItemIds)];
+    const inventoryItems = await this.inventoryItemRepository.findByIds(
+      organizationId,
+      ids,
+    );
+    if (inventoryItems.length !== ids.length) {
+      throw new NotFoundException(
+        'One or more inventory items were not found in this organization',
+      );
+    }
+  }
+
   private requireOrganizationId(context: OrganizationContext) {
     if (!context.organizationId) {
       throw new ForbiddenException('Organization context is required');
@@ -141,12 +157,12 @@ export class InventoryItemService {
 
   private async ensureExists(id: string, organizationId: string) {
     const item = await this.inventoryItemRepository.findById(
-      id,
       organizationId,
+      id,
     );
 
     if (!item) {
-      throw new NotFoundException('Inventory item not found');
+      throw new NotFoundException('Barang tidak ada');
     }
   }
 

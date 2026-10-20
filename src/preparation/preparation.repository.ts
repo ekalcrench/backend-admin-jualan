@@ -9,50 +9,12 @@ import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
 import { CreatePreparationItemDto } from './dto/create-preparation-item.dto.js';
 import { UpdatePreparationItemDto } from './dto/update-preparation-item.dto.js';
-
-const preparationInclude = {
-  outputInventoryItem: { select: { id: true, name: true, unit: true } },
-  items: {
-    orderBy: { id: 'asc' },
-    include: {
-      inventoryItem: { select: { id: true, name: true, unit: true } },
-      allocations: { orderBy: { id: 'asc' } },
-    },
-  },
-} satisfies Prisma.PreparationInclude;
-
-type PreparationItemInput = CreatePreparationItemDto & { id?: string };
-
-type PreparationValues = {
-  name?: string;
-  status?: PreparationStatus;
-  preparedAt?: Date;
-  expiredAt?: Date | null;
-  notes?: string;
-  outputInventoryItemId?: string;
-  outputQuantity?: Prisma.Decimal;
-};
-
-type PlannedAllocation = {
-  inventoryLotId: string;
-  quantity: Prisma.Decimal;
-  unitCost: Prisma.Decimal;
-  totalCost: Prisma.Decimal;
-};
-
-type PlannedItem = {
-  id?: string;
-  inventoryItemId: string;
-  quantity: Prisma.Decimal;
-  unitCost: Prisma.Decimal;
-  totalCost: Prisma.Decimal;
-  allocations: PlannedAllocation[];
-};
-
-class StockChangedError extends Error {}
-
-const roundCost = (amount: Prisma.Decimal, decimalPlaces: number) =>
-  amount.toDecimalPlaces(decimalPlaces, Prisma.Decimal.ROUND_HALF_UP);
+import { preparationInclude } from './constants/response-include.constants.js';
+import { PreparationItemInput } from './types/preparation-item-input.types.js';
+import { PreparationValues } from './types/preparation-values.types.js';
+import { PlannedAllocation } from './types/planned-allocation.types.js';
+import { PlannedItem } from './types/planned-item.types.js';
+import { roundCost } from '../common/constants/round-cost.constants.js';
 
 @Injectable()
 export class PreparationRepository {
@@ -65,7 +27,6 @@ export class PreparationRepository {
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
-          { notes: { contains: search, mode: 'insensitive' } },
           {
             outputInventoryItem: {
               name: { contains: search, mode: 'insensitive' },
@@ -99,13 +60,6 @@ export class PreparationRepository {
     return { items, total };
   }
 
-  findInventoryItemsByIds(organizationId: string, ids: string[]) {
-    return this.prisma.inventoryItem.findMany({
-      where: { organizationId, id: { in: ids }, isActive: true },
-      select: { id: true },
-    });
-  }
-
   findById(id: string, organizationId: string) {
     return this.prisma.preparation.findFirst({
       where: { id, organizationId },
@@ -123,45 +77,43 @@ export class PreparationRepository {
     },
     items: CreatePreparationItemDto[],
   ) {
-    return this.withStockConflictHandling(() =>
-      this.prisma.$transaction(
-        async (transaction) => {
-          const plannedItems = await this.planItems(transaction, items);
-          if (!plannedItems) {
-            return 'insufficient-stock' as const;
-          }
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const plannedItems = await this.planItems(transaction, items);
+        if (!plannedItems) {
+          return 'insufficient-stock' as const;
+        }
 
-          await this.decreaseLotQuantities(transaction, plannedItems);
-          const costs = this.calculateOutputCosts(
-            plannedItems,
-            values.outputQuantity,
-          );
-          const preparation = await transaction.preparation.create({
-            data: {
-              organizationId,
-              name: values.name,
-              preparedAt: values.preparedAt,
-              expiredAt: values.expiredAt,
-              notes: values.notes,
-              outputInventoryItemId: values.outputInventoryItemId,
-              outputQuantity: values.outputQuantity,
-              outputUnitCost: costs.unitCost,
-              outputTotalCost: costs.totalCost,
-            },
-          });
+        await this.decreaseLotQuantities(transaction, plannedItems);
+        const costs = this.calculateOutputCosts(
+          plannedItems,
+          values.outputQuantity,
+        );
+        const preparation = await transaction.preparation.create({
+          data: {
+            organizationId,
+            name: values.name,
+            preparedAt: values.preparedAt,
+            expiredAt: values.expiredAt,
+            notes: values.notes,
+            outputInventoryItemId: values.outputInventoryItemId,
+            outputQuantity: values.outputQuantity,
+            outputUnitCost: costs.unitCost,
+            outputTotalCost: costs.totalCost,
+          },
+        });
 
-          await this.createPreparationItems(
-            transaction,
-            preparation.id,
-            plannedItems,
-          );
-          return transaction.preparation.findFirstOrThrow({
-            where: { id: preparation.id, organizationId },
-            include: preparationInclude,
-          });
-        },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      ),
+        await this.createPreparationItems(
+          transaction,
+          preparation.id,
+          plannedItems,
+        );
+        return transaction.preparation.findFirstOrThrow({
+          where: { id: preparation.id, organizationId },
+          include: preparationInclude,
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   }
 
@@ -172,247 +124,243 @@ export class PreparationRepository {
     itemChanges?: UpdatePreparationItemDto[],
     deletedPreparationItemIds: string[] = [],
   ) {
-    return this.withStockConflictHandling(() =>
-      this.prisma.$transaction(
-        async (transaction) => {
-          const preparation = await transaction.preparation.findFirst({
-            where: { id, organizationId },
-            include: {
-              outputLot: {
-                include: {
-                  _count: {
-                    select: {
-                      inventoryConsumptions: true,
-                      preparationAllocations: true,
-                    },
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const preparation = await transaction.preparation.findFirst({
+          where: { id, organizationId },
+          include: {
+            outputLot: {
+              include: {
+                _count: {
+                  select: {
+                    inventoryConsumptions: true,
+                    preparationAllocations: true,
                   },
                 },
               },
-              items: { include: { allocations: true } },
             },
-          });
-          if (!preparation) {
-            return 'not-found' as const;
-          }
-          if (preparation.status !== PreparationStatus.DRAFT) {
-            return 'not-draft' as const;
-          }
+            items: { include: { allocations: true } },
+          },
+        });
+        if (!preparation) {
+          return 'not-found' as const;
+        }
+        if (preparation.status !== PreparationStatus.DRAFT) {
+          return 'not-draft' as const;
+        }
 
-          const existingItemsById = new Map(
-            preparation.items.map((item) => [item.id, item]),
+        const existingItemsById = new Map(
+          preparation.items.map((item) => [item.id, item]),
+        );
+        const changes = itemChanges ?? [];
+        const updateIds = changes
+          .map((item) => item.id)
+          .filter((itemId): itemId is string => itemId !== undefined);
+        if (
+          new Set(updateIds).size !== updateIds.length ||
+          new Set(deletedPreparationItemIds).size !==
+            deletedPreparationItemIds.length ||
+          deletedPreparationItemIds.some((itemId) =>
+            updateIds.includes(itemId),
+          ) ||
+          updateIds.some((itemId) => !existingItemsById.has(itemId)) ||
+          deletedPreparationItemIds.some(
+            (itemId) => !existingItemsById.has(itemId),
+          )
+        ) {
+          return 'related-record-not-found' as const;
+        }
+
+        const requestedOutputItemId =
+          values.outputInventoryItemId ?? preparation.outputInventoryItemId;
+        const requestedOutputQuantity = new Prisma.Decimal(
+          values.outputQuantity ?? preparation.outputQuantity,
+        );
+        const requestedPreparedAt = values.preparedAt ?? preparation.preparedAt;
+        const requestedExpiredAt =
+          values.expiredAt === undefined
+            ? preparation.expiredAt
+            : values.expiredAt;
+        const requestedStatus = values.status ?? preparation.status;
+        const isCompleting =
+          preparation.status === PreparationStatus.DRAFT &&
+          requestedStatus === PreparationStatus.COMPLETED;
+        const hasItemChanges =
+          changes.length > 0 || deletedPreparationItemIds.length > 0;
+        const outputLotNeedsUpdate =
+          isCompleting ||
+          hasItemChanges ||
+          requestedOutputItemId !== preparation.outputInventoryItemId ||
+          !requestedOutputQuantity.equals(preparation.outputQuantity) ||
+          requestedPreparedAt.getTime() !== preparation.preparedAt.getTime() ||
+          (requestedExpiredAt?.getTime() ?? null) !==
+            (preparation.expiredAt?.getTime() ?? null);
+
+        if (
+          outputLotNeedsUpdate &&
+          preparation.outputLot &&
+          (preparation.outputLot.remainingQuantity.lessThan(
+            preparation.outputLot.quantity,
+          ) ||
+            preparation.outputLot._count.inventoryConsumptions > 0 ||
+            preparation.outputLot._count.preparationAllocations > 0)
+        ) {
+          return 'output-consumed' as const;
+        }
+
+        let plannedItems: PlannedItem[] | undefined;
+        if (hasItemChanges) {
+          const changedById = new Map(
+            changes
+              .filter(
+                (item): item is UpdatePreparationItemDto & { id: string } =>
+                  item.id !== undefined,
+              )
+              .map((item) => [item.id, item]),
           );
-          const changes = itemChanges ?? [];
-          const updateIds = changes
-            .map((item) => item.id)
-            .filter((itemId): itemId is string => itemId !== undefined);
-          if (
-            new Set(updateIds).size !== updateIds.length ||
-            new Set(deletedPreparationItemIds).size !==
-              deletedPreparationItemIds.length ||
-            deletedPreparationItemIds.some((itemId) =>
-              updateIds.includes(itemId),
-            ) ||
-            updateIds.some((itemId) => !existingItemsById.has(itemId)) ||
-            deletedPreparationItemIds.some(
-              (itemId) => !existingItemsById.has(itemId),
-            )
-          ) {
-            return 'related-record-not-found' as const;
-          }
-
-          const requestedOutputItemId =
-            values.outputInventoryItemId ?? preparation.outputInventoryItemId;
-          const requestedOutputQuantity = new Prisma.Decimal(
-            values.outputQuantity ?? preparation.outputQuantity,
-          );
-          const requestedPreparedAt =
-            values.preparedAt ?? preparation.preparedAt;
-          const requestedExpiredAt =
-            values.expiredAt === undefined
-              ? preparation.expiredAt
-              : values.expiredAt;
-          const requestedStatus = values.status ?? preparation.status;
-          const isCompleting =
-            preparation.status === PreparationStatus.DRAFT &&
-            requestedStatus === PreparationStatus.COMPLETED;
-          const hasItemChanges =
-            changes.length > 0 || deletedPreparationItemIds.length > 0;
-          const outputLotNeedsUpdate =
-            isCompleting ||
-            hasItemChanges ||
-            requestedOutputItemId !== preparation.outputInventoryItemId ||
-            !requestedOutputQuantity.equals(preparation.outputQuantity) ||
-            requestedPreparedAt.getTime() !==
-              preparation.preparedAt.getTime() ||
-            (requestedExpiredAt?.getTime() ?? null) !==
-              (preparation.expiredAt?.getTime() ?? null);
-
-          if (
-            outputLotNeedsUpdate &&
-            preparation.outputLot &&
-            (preparation.outputLot.remainingQuantity.lessThan(
-              preparation.outputLot.quantity,
-            ) ||
-              preparation.outputLot._count.inventoryConsumptions > 0 ||
-              preparation.outputLot._count.preparationAllocations > 0)
-          ) {
-            return 'output-consumed' as const;
-          }
-
-          let plannedItems: PlannedItem[] | undefined;
-          if (hasItemChanges) {
-            const changedById = new Map(
-              changes
-                .filter(
-                  (item): item is UpdatePreparationItemDto & { id: string } =>
-                    item.id !== undefined,
-                )
-                .map((item) => [item.id, item]),
-            );
-            const mergedItems: PreparationItemInput[] = preparation.items
-              .filter((item) => !deletedPreparationItemIds.includes(item.id))
-              .map((item) => {
-                const change = changedById.get(item.id);
-                return {
-                  id: item.id,
-                  inventoryItemId:
-                    change?.inventoryItemId ?? item.inventoryItemId,
-                  quantity: change?.quantity ?? item.quantity.toNumber(),
-                };
-              });
-            for (const change of changes) {
-              if (!change.id) {
-                if (
-                  change.inventoryItemId === undefined ||
-                  change.quantity === undefined
-                ) {
-                  return 'related-record-not-found' as const;
-                }
-                mergedItems.push({
-                  inventoryItemId: change.inventoryItemId,
-                  quantity: change.quantity,
-                });
-              }
-            }
-
-            if (!mergedItems.length) {
-              return 'empty-preparation' as const;
-            }
-
-            plannedItems = await this.planItems(
-              transaction,
-              mergedItems,
-              preparation.items.flatMap((item) =>
-                item.allocations.map((allocation) => ({
-                  inventoryLotId: allocation.inventoryLotId,
-                  quantity: allocation.quantity,
-                })),
-              ),
-            );
-            if (!plannedItems) {
-              return 'insufficient-stock' as const;
-            }
-
-            for (const item of preparation.items) {
-              for (const allocation of item.allocations) {
-                await transaction.inventoryLot.update({
-                  where: { id: allocation.inventoryLotId },
-                  data: {
-                    remainingQuantity: { increment: allocation.quantity },
-                  },
-                });
-              }
-            }
-            await transaction.preparationItem.deleteMany({
-              where: { preparationId: id },
+          const mergedItems: PreparationItemInput[] = preparation.items
+            .filter((item) => !deletedPreparationItemIds.includes(item.id))
+            .map((item) => {
+              const change = changedById.get(item.id);
+              return {
+                id: item.id,
+                inventoryItemId:
+                  change?.inventoryItemId ?? item.inventoryItemId,
+                quantity: change?.quantity ?? item.quantity.toNumber(),
+              };
             });
-            await this.decreaseLotQuantities(transaction, plannedItems);
-            await this.createPreparationItems(transaction, id, plannedItems);
+          for (const change of changes) {
+            if (!change.id) {
+              if (
+                change.inventoryItemId === undefined ||
+                change.quantity === undefined
+              ) {
+                return 'related-record-not-found' as const;
+              }
+              mergedItems.push({
+                inventoryItemId: change.inventoryItemId,
+                quantity: change.quantity,
+              });
+            }
           }
 
-          const effectiveItems =
-            plannedItems ??
-            preparation.items.map((item) => ({
-              unitCost: item.unitCost,
-              quantity: item.quantity,
-              totalCost: item.totalCost,
-            }));
-          const costs = this.calculateOutputCosts(
-            effectiveItems,
-            requestedOutputQuantity,
+          if (!mergedItems.length) {
+            return 'empty-preparation' as const;
+          }
+
+          plannedItems = await this.planItems(
+            transaction,
+            mergedItems,
+            preparation.items.flatMap((item) =>
+              item.allocations.map((allocation) => ({
+                inventoryLotId: allocation.inventoryLotId,
+                quantity: allocation.quantity,
+              })),
+            ),
           );
+          if (!plannedItems) {
+            return 'insufficient-stock' as const;
+          }
 
-          await transaction.preparation.update({
-            where: { id },
-            data: {
-              ...values,
-              outputQuantity: requestedOutputQuantity,
-              outputUnitCost: costs.unitCost,
-              outputTotalCost: costs.totalCost,
-            },
-          });
-
-          if (
-            requestedStatus === PreparationStatus.COMPLETED &&
-            (outputLotNeedsUpdate || !preparation.outputLot)
-          ) {
-            if (preparation.outputLot) {
+          for (const item of preparation.items) {
+            for (const allocation of item.allocations) {
               await transaction.inventoryLot.update({
-                where: { id: preparation.outputLot.id },
+                where: { id: allocation.inventoryLotId },
                 data: {
-                  inventoryItemId: requestedOutputItemId,
-                  quantity: requestedOutputQuantity,
-                  remainingQuantity: requestedOutputQuantity,
-                  unitCost: costs.unitCost,
-                  totalCost: costs.totalCost,
-                  receivedAt: requestedPreparedAt,
-                  expiredAt: requestedExpiredAt,
+                  remainingQuantity: { increment: allocation.quantity },
                 },
-              });
-            } else {
-              await transaction.inventoryLot.create({
-                data: {
-                  inventoryItemId: requestedOutputItemId,
-                  purchaseItemId: null,
-                  preparationOutputId: id,
-                  quantity: requestedOutputQuantity,
-                  remainingQuantity: requestedOutputQuantity,
-                  unitCost: costs.unitCost,
-                  totalCost: costs.totalCost,
-                  receivedAt: requestedPreparedAt,
-                  expiredAt: requestedExpiredAt,
-                },
-              });
-            }
-            if (isCompleting) {
-              await transaction.inventoryTransaction.createMany({
-                data: [
-                  {
-                    organizationId,
-                    inventoryItemId: requestedOutputItemId,
-                    type: InventoryTransactionType.PREPARATION_IN,
-                    quantity: requestedOutputQuantity,
-                    referenceId: id,
-                  },
-                  ...preparation.items.map((item) => ({
-                    organizationId,
-                    inventoryItemId: item.inventoryItemId,
-                    type: InventoryTransactionType.PREPARATION_OUT,
-                    quantity: item.quantity,
-                    referenceId: id,
-                  })),
-                ],
               });
             }
           }
-
-          return transaction.preparation.findFirstOrThrow({
-            where: { id, organizationId },
-            include: preparationInclude,
+          await transaction.preparationItem.deleteMany({
+            where: { preparationId: id },
           });
-        },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      ),
+          await this.decreaseLotQuantities(transaction, plannedItems);
+          await this.createPreparationItems(transaction, id, plannedItems);
+        }
+
+        const effectiveItems =
+          plannedItems ??
+          preparation.items.map((item) => ({
+            unitCost: item.unitCost,
+            quantity: item.quantity,
+            totalCost: item.totalCost,
+          }));
+        const costs = this.calculateOutputCosts(
+          effectiveItems,
+          requestedOutputQuantity,
+        );
+
+        await transaction.preparation.update({
+          where: { id },
+          data: {
+            ...values,
+            outputQuantity: requestedOutputQuantity,
+            outputUnitCost: costs.unitCost,
+            outputTotalCost: costs.totalCost,
+          },
+        });
+
+        if (
+          requestedStatus === PreparationStatus.COMPLETED &&
+          (outputLotNeedsUpdate || !preparation.outputLot)
+        ) {
+          if (preparation.outputLot) {
+            await transaction.inventoryLot.update({
+              where: { id: preparation.outputLot.id },
+              data: {
+                inventoryItemId: requestedOutputItemId,
+                quantity: requestedOutputQuantity,
+                remainingQuantity: requestedOutputQuantity,
+                unitCost: costs.unitCost,
+                totalCost: costs.totalCost,
+                receivedAt: requestedPreparedAt,
+                expiredAt: requestedExpiredAt,
+              },
+            });
+          } else {
+            await transaction.inventoryLot.create({
+              data: {
+                inventoryItemId: requestedOutputItemId,
+                purchaseItemId: null,
+                preparationOutputId: id,
+                quantity: requestedOutputQuantity,
+                remainingQuantity: requestedOutputQuantity,
+                unitCost: costs.unitCost,
+                totalCost: costs.totalCost,
+                receivedAt: requestedPreparedAt,
+                expiredAt: requestedExpiredAt,
+              },
+            });
+          }
+          if (isCompleting) {
+            await transaction.inventoryTransaction.createMany({
+              data: [
+                {
+                  organizationId,
+                  inventoryItemId: requestedOutputItemId,
+                  type: InventoryTransactionType.PREPARATION_IN,
+                  quantity: requestedOutputQuantity,
+                  referenceId: id,
+                },
+                ...preparation.items.map((item) => ({
+                  organizationId,
+                  inventoryItemId: item.inventoryItemId,
+                  type: InventoryTransactionType.PREPARATION_OUT,
+                  quantity: item.quantity,
+                  referenceId: id,
+                })),
+              ],
+            });
+          }
+        }
+
+        return transaction.preparation.findFirstOrThrow({
+          where: { id, organizationId },
+          include: preparationInclude,
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   }
 
@@ -590,7 +538,7 @@ export class PreparationRepository {
           data: { remainingQuantity: { decrement: allocation.quantity } },
         });
         if (result.count !== 1) {
-          throw new StockChangedError();
+          throw new Error();
         }
       }
     }
@@ -604,7 +552,7 @@ export class PreparationRepository {
     for (const item of items) {
       const firstLotId = item.allocations[0]?.inventoryLotId;
       if (!firstLotId) {
-        throw new StockChangedError();
+        throw new Error();
       }
       await transaction.preparationItem.create({
         data: {
@@ -645,18 +593,5 @@ export class PreparationRepository {
       unitCost,
       totalCost,
     };
-  }
-
-  private async withStockConflictHandling<T>(
-    operation: () => Promise<T>,
-  ): Promise<T | 'insufficient-stock'> {
-    try {
-      return await operation();
-    } catch (error) {
-      if (error instanceof StockChangedError) {
-        return 'insufficient-stock';
-      }
-      throw error;
-    }
   }
 }

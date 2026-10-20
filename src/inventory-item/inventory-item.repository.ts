@@ -3,25 +3,8 @@ import { Prisma } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
-
-const itemWithLots = {
-  lots: {
-    orderBy: { receivedAt: 'asc' },
-    select: {
-      remainingQuantity: true,
-      unitCost: true,
-    },
-  },
-} satisfies Prisma.InventoryItemInclude;
-
-const aggregateSortExpressions = {
-  totalStock: Prisma.sql`COALESCE(SUM(lot.remaining_quantity), 0)`,
-  totalCost: Prisma.sql`COALESCE(SUM(lot.unit_cost * lot.remaining_quantity), 0)`,
-  averageCost: Prisma.sql`CASE
-    WHEN COALESCE(SUM(lot.remaining_quantity), 0) = 0 THEN 0
-    ELSE SUM(lot.unit_cost * lot.remaining_quantity) / SUM(lot.remaining_quantity)
-  END`,
-};
+import { itemWithLots } from './constants/response-include.constants.js';
+import { inventoryItemAggregateSort } from './constants/aggregator-sort.constants.js';
 
 @Injectable()
 export class InventoryItemRepository {
@@ -132,17 +115,17 @@ export class InventoryItemRepository {
     switch (field) {
       case 'totalStock':
         return {
-          expression: aggregateSortExpressions.totalStock,
+          expression: inventoryItemAggregateSort.totalStock,
           direction: descending ? 'DESC' : 'ASC',
         } as const;
       case 'averageCost':
         return {
-          expression: aggregateSortExpressions.averageCost,
+          expression: inventoryItemAggregateSort.averageCost,
           direction: descending ? 'DESC' : 'ASC',
         } as const;
       case 'totalCost':
         return {
-          expression: aggregateSortExpressions.totalCost,
+          expression: inventoryItemAggregateSort.totalCost,
           direction: descending ? 'DESC' : 'ASC',
         } as const;
       default:
@@ -150,10 +133,17 @@ export class InventoryItemRepository {
     }
   }
 
-  findById(id: string, organizationId: string) {
+  findById(organizationId: string, id: string) {
     return this.prisma.inventoryItem.findFirst({
       where: { id, organizationId, isActive: true },
       include: itemWithLots,
+    });
+  }
+
+  findByIds(organizationId: string, ids: string[]) {
+    return this.prisma.inventoryItem.findMany({
+      where: { organizationId, id: { in: ids }, isActive: true },
+      select: { id: true },
     });
   }
 

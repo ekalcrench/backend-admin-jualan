@@ -12,10 +12,14 @@ import { CreatePreparationDto } from './dto/create-preparation.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdatePreparationDto } from './dto/update-preparation.dto.js';
 import { PreparationRepository } from './preparation.repository.js';
+import { InventoryItemService } from '../inventory-item/inventory-item.service.js';
 
 @Injectable()
 export class PreparationService {
-  constructor(private readonly preparationRepository: PreparationRepository) {}
+  constructor(
+    private readonly preparationRepository: PreparationRepository,
+    private readonly inventoryItemService: InventoryItemService,
+  ) {}
 
   async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
     const organizationId = this.requireOrganizationId(context);
@@ -49,7 +53,7 @@ export class PreparationService {
 
   async create(dto: CreatePreparationDto, context: OrganizationContext) {
     const organizationId = this.requireOrganizationId(context);
-    await this.ensureInventoryItemsBelongToOrganization(
+    await this.inventoryItemService.ensureInventoryItemsBelongToOrganization(
       [
         dto.outputInventoryItemId,
         ...dto.preparationItems.map((item) => item.inventoryItemId),
@@ -63,7 +67,7 @@ export class PreparationService {
         name: dto.name,
         preparedAt: new Date(dto.preparedAt),
         expiredAt: dto.expiredAt ? new Date(dto.expiredAt) : null,
-        notes: dto.notes,
+        notes: dto.notes ?? undefined,
         outputInventoryItemId: dto.outputInventoryItemId,
         outputQuantity: new Prisma.Decimal(dto.outputQuantity),
       },
@@ -89,7 +93,7 @@ export class PreparationService {
         .filter((itemId): itemId is string => itemId !== undefined) ?? []),
     ];
     if (inventoryItemIds.length) {
-      await this.ensureInventoryItemsBelongToOrganization(
+      await this.inventoryItemService.ensureInventoryItemsBelongToOrganization(
         inventoryItemIds,
         organizationId,
       );
@@ -207,23 +211,6 @@ export class PreparationService {
       throw new ForbiddenException('Organization context is required');
     }
     return context.organizationId;
-  }
-
-  private async ensureInventoryItemsBelongToOrganization(
-    inventoryItemIds: string[],
-    organizationId: string,
-  ) {
-    const ids = [...new Set(inventoryItemIds)];
-    const inventoryItems =
-      await this.preparationRepository.findInventoryItemsByIds(
-        organizationId,
-        ids,
-      );
-    if (inventoryItems.length !== ids.length) {
-      throw new NotFoundException(
-        'One or more inventory items were not found in this organization',
-      );
-    }
   }
 
   private toResponse(
