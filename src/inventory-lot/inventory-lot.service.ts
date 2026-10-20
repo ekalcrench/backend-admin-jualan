@@ -48,18 +48,30 @@ export class InventoryLotService {
       purchaseItem?: {
         purchase: { invoiceNumber: string | null; supplierName: string | null };
       } | null;
+      preparationOutput?: {
+        name: string;
+      } | null;
     } & Record<string, unknown>,
   ) {
-    const { purchaseItem, ...rest } = lot;
+    const {
+      purchaseItem,
+      preparationOutput,
+      quantity,
+      unitCost,
+      totalCost,
+      remainingQuantity,
+      ...rest
+    } = lot;
 
     return {
       ...rest,
       invoiceNumber: purchaseItem?.purchase.invoiceNumber ?? null,
       supplierName: purchaseItem?.purchase.supplierName ?? null,
-      quantity: lot.quantity.toNumber(),
-      remainingQuantity: lot.remainingQuantity.toNumber(),
-      unitCost: lot.unitCost.toNumber(),
-      totalCost: lot.totalCost.toNumber(),
+      quantity: quantity.toNumber(),
+      remainingQuantity: remainingQuantity.toNumber(),
+      unitCost: unitCost.toNumber(),
+      totalCost: totalCost.toNumber(),
+      preparationName: preparationOutput?.name,
     };
   }
 }

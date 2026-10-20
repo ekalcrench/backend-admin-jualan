@@ -1,19 +1,26 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
 
-export class InventoryLotResponseDto {
-  @ApiProperty()
+export class InventoryLotResponseDto extends BaseResponseDto {
+  @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty()
+  @ApiProperty({ format: 'uuid' })
   inventoryItemId!: string;
 
-  @ApiProperty()
-  purchaseItemId!: string;
+  @ApiPropertyOptional({ nullable: true, format: 'uuid', type: String })
+  purchaseItemId!: string | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiPropertyOptional({ nullable: true, format: 'uuid', type: String })
+  preparationOutputId!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, example: 'Proses pembuatan soto' })
+  preparationName!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, example: 'INV-001' })
   invoiceNumber!: string | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiPropertyOptional({ nullable: true, example: 'Yogya Toserba' })
   supplierName!: string | null;
 
   @ApiProperty()
@@ -31,12 +38,6 @@ export class InventoryLotResponseDto {
   @ApiProperty()
   receivedAt!: Date;
 
-  @ApiProperty({ nullable: true })
+  @ApiPropertyOptional({ nullable: true, format: 'date', type: 'string' })
   expiredAt!: Date | null;
-
-  @ApiProperty()
-  createdAt!: Date;
-
-  @ApiProperty()
-  updatedAt!: Date;
 }

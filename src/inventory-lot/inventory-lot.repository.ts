@@ -50,6 +50,9 @@ export class InventoryLotRepository {
               },
             },
           },
+          preparationOutput: {
+            select: { name: true },
+          },
         },
       }),
       this.prisma.inventoryLot.count({ where }),
