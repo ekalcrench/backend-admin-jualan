@@ -26,7 +26,7 @@ import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto.js
 import { OrganizationUserResponseDto } from './dto/organization-user-response.dto.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { UserRole } from '../common/enums/user-role.enum.js';
-import { GetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
+import { OrganizationUserGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import type { Request } from 'express';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
@@ -42,7 +42,7 @@ export class OrganizationUserController {
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Retrieve organizations by pages' })
-  @ApiOkResponse({ type: GetByPagesResponseDto })
+  @ApiOkResponse({ type: OrganizationUserGetByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
     @Query() query: GetByPagesDto,

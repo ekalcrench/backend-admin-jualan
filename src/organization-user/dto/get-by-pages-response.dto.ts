@@ -36,7 +36,7 @@ export class CustomOrganizationUserResponseDto {
   email!: string;
 }
 
-export class GetByPagesResponseDto {
+export class OrganizationUserGetByPagesResponseDto {
   @ApiProperty({ type: [CustomOrganizationUserResponseDto] })
   items!: CustomOrganizationUserResponseDto[];
 
