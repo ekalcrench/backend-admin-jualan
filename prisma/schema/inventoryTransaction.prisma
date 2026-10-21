@@ -2,16 +2,22 @@ model InventoryTransaction {
   id              String @id @default(uuid()) @db.Uuid
   organizationId  String @map("organization_id") @db.Uuid
   inventoryItemId String @map("inventory_item_id") @db.Uuid
+  inventoryLotId  String @default("4cf5dd49-eb63-4a51-b577-e7b2a08923f0") @map("inventory_lot_id") @db.Uuid
 
+  // Untuk relationship dengan table mana berdasarkan type apa
   type        InventoryTransactionType
-  quantity    Decimal                  @db.Decimal(15, 3)
   referenceId String?                  @map("reference_id") @db.Uuid
+
+  quantity  Decimal @db.Decimal(15, 3)
+  unitCost  Decimal @default(0) @map("unit_cost") @db.Decimal(15, 3)
+  totalCost Decimal @default(0) @map("total_cost") @db.Decimal(15, 2)
 
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relationships
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
   organization  Organization  @relation(fields: [organizationId], references: [id])
+  inventoryLot  InventoryLot  @relation(fields: [inventoryLotId], references: [id])
   preparations  Preparation[]
 
   @@index([organizationId, createdAt])

@@ -17,9 +17,9 @@ model InventoryLot {
   // Relationships
   inventoryItem          InventoryItem                   @relation(fields: [inventoryItemId], references: [id])
   purchaseItem           PurchaseItem?                   @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
-  inventoryConsumptions  InventoryConsumption[]
   preparationOutput      Preparation?                    @relation(fields: [preparationOutputId], references: [id])
   preparationAllocations PreparationItemLotConsumption[]
+  inventoryTransactions  InventoryTransaction[]
 
   @@index([inventoryItemId, receivedAt])
   @@index([purchaseItemId])
