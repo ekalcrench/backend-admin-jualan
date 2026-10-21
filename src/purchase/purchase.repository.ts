@@ -102,17 +102,21 @@ export class PurchaseRepository {
               totalCost: true,
               receivedAt: true,
               expiredAt: true,
-              inventoryLot: { select: { id: true } },
+              inventoryLot: {
+                select: { id: true, unitCost: true, totalCost: true },
+              },
             },
           },
         },
       });
 
+      const inventoryTransactions: Prisma.InventoryTransactionCreateManyInput[] =
+        [];
       for (const item of purchase.purchaseItems) {
         const totalQuantity = item.packageSize.mul(item.quantity);
-
-        if (!item.inventoryLot) {
-          await transaction.inventoryLot.create({
+        const inventoryLot =
+          item.inventoryLot ??
+          (await transaction.inventoryLot.create({
             data: {
               inventoryItemId: item.inventoryItemId,
               purchaseItemId: item.id,
@@ -123,19 +127,22 @@ export class PurchaseRepository {
               receivedAt: item.receivedAt,
               expiredAt: item.expiredAt,
             },
-          });
-        }
+          }));
+        inventoryTransactions.push({
+          organizationId: purchase.organizationId,
+          inventoryItemId: item.inventoryItemId,
+          inventoryLotId: inventoryLot.id,
+          type: InventoryTransactionType.PURCHASE,
+          quantity: totalQuantity,
+          unitCost: inventoryLot.unitCost,
+          totalCost: inventoryLot.totalCost,
+          referenceId: purchase.id,
+        });
       }
 
-      if (purchase.purchaseItems.length) {
+      if (inventoryTransactions.length) {
         await transaction.inventoryTransaction.createMany({
-          data: purchase.purchaseItems.map((item) => ({
-            organizationId: purchase.organizationId,
-            inventoryItemId: item.inventoryItemId,
-            type: InventoryTransactionType.PURCHASE,
-            quantity: item.packageSize.mul(item.quantity),
-            referenceId: purchase.id,
-          })),
+          data: inventoryTransactions,
         });
       }
 
@@ -180,9 +187,10 @@ export class PurchaseRepository {
             inventoryLot: {
               select: {
                 id: true,
+                quantity: true,
+                remainingQuantity: true,
                 _count: {
                   select: {
-                    inventoryConsumptions: true,
                     preparationAllocations: true,
                   },
                 },
@@ -198,7 +206,9 @@ export class PurchaseRepository {
           existingItems.some(
             (item) =>
               item.inventoryLot &&
-              (item.inventoryLot._count.inventoryConsumptions > 0 ||
+              (item.inventoryLot.remainingQuantity.lessThan(
+                item.inventoryLot.quantity,
+              ) ||
                 item.inventoryLot._count.preparationAllocations > 0),
           )
         ) {
@@ -222,9 +232,10 @@ export class PurchaseRepository {
         const lotsToDelete = await transaction.inventoryLot.findMany({
           where: { purchaseItemId: { in: deletedPurchaseItemIds } },
           select: {
+            quantity: true,
+            remainingQuantity: true,
             _count: {
               select: {
-                inventoryConsumptions: true,
                 preparationAllocations: true,
               },
             },
@@ -234,7 +245,7 @@ export class PurchaseRepository {
         if (
           lotsToDelete.some(
             (lot) =>
-              lot._count.inventoryConsumptions > 0 ||
+              lot.remainingQuantity.lessThan(lot.quantity) ||
               lot._count.preparationAllocations > 0,
           )
         ) {
@@ -336,9 +347,10 @@ export class PurchaseRepository {
             where: { purchaseItemId: { in: purchaseItemIds } },
             select: {
               id: true,
+              quantity: true,
+              remainingQuantity: true,
               _count: {
                 select: {
-                  inventoryConsumptions: true,
                   preparationAllocations: true,
                 },
               },
@@ -346,10 +358,9 @@ export class PurchaseRepository {
           })
         : [];
 
-      if (lots.some((lot) => lot._count.inventoryConsumptions > 0)) {
+      if (lots.some((lot) => lot.remainingQuantity.lessThan(lot.quantity))) {
         return 'consumed' as const;
       }
-
       if (lots.some((lot) => lot._count.preparationAllocations > 0)) {
         return 'preparation-records-exist' as const;
       }

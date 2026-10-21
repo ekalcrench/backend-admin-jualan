@@ -133,7 +133,6 @@ export class PreparationRepository {
               include: {
                 _count: {
                   select: {
-                    inventoryConsumptions: true,
                     preparationAllocations: true,
                   },
                 },
@@ -202,7 +201,6 @@ export class PreparationRepository {
           (preparation.outputLot.remainingQuantity.lessThan(
             preparation.outputLot.quantity,
           ) ||
-            preparation.outputLot._count.inventoryConsumptions > 0 ||
             preparation.outputLot._count.preparationAllocations > 0)
         ) {
           return 'output-consumed' as const;
@@ -305,7 +303,9 @@ export class PreparationRepository {
           requestedStatus === PreparationStatus.COMPLETED &&
           (outputLotNeedsUpdate || !preparation.outputLot)
         ) {
+          let outputLotId: string;
           if (preparation.outputLot) {
+            outputLotId = preparation.outputLot.id;
             await transaction.inventoryLot.update({
               where: { id: preparation.outputLot.id },
               data: {
@@ -319,7 +319,7 @@ export class PreparationRepository {
               },
             });
           } else {
-            await transaction.inventoryLot.create({
+            const outputLot = await transaction.inventoryLot.create({
               data: {
                 inventoryItemId: requestedOutputItemId,
                 purchaseItemId: null,
@@ -332,24 +332,34 @@ export class PreparationRepository {
                 expiredAt: requestedExpiredAt,
               },
             });
+            outputLotId = outputLot.id;
           }
           if (isCompleting) {
+            const preparationItems = plannedItems ?? preparation.items;
             await transaction.inventoryTransaction.createMany({
               data: [
                 {
                   organizationId,
                   inventoryItemId: requestedOutputItemId,
+                  inventoryLotId: outputLotId,
                   type: InventoryTransactionType.PREPARATION_IN,
                   quantity: requestedOutputQuantity,
+                  unitCost: costs.unitCost,
+                  totalCost: costs.totalCost,
                   referenceId: id,
                 },
-                ...preparation.items.map((item) => ({
-                  organizationId,
-                  inventoryItemId: item.inventoryItemId,
-                  type: InventoryTransactionType.PREPARATION_OUT,
-                  quantity: item.quantity,
-                  referenceId: id,
-                })),
+                ...preparationItems.flatMap((item) =>
+                  item.allocations.map((allocation) => ({
+                    organizationId,
+                    inventoryItemId: item.inventoryItemId,
+                    inventoryLotId: allocation.inventoryLotId,
+                    type: InventoryTransactionType.PREPARATION_OUT,
+                    quantity: allocation.quantity,
+                    unitCost: allocation.unitCost,
+                    totalCost: allocation.totalCost,
+                    referenceId: id,
+                  })),
+                ),
               ],
             });
           }
@@ -380,7 +390,6 @@ export class PreparationRepository {
               include: {
                 _count: {
                   select: {
-                    inventoryConsumptions: true,
                     preparationAllocations: true,
                   },
                 },
@@ -400,7 +409,6 @@ export class PreparationRepository {
           (preparation.outputLot.remainingQuantity.lessThan(
             preparation.outputLot.quantity,
           ) ||
-            preparation.outputLot._count.inventoryConsumptions > 0 ||
             preparation.outputLot._count.preparationAllocations > 0)
         ) {
           return 'output-consumed' as const;
