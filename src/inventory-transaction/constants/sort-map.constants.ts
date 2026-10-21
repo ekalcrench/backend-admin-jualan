@@ -8,6 +8,10 @@ export const sortMap: Record<
   '-quantity': { quantity: 'desc' },
   type: { type: 'asc' },
   '-type': { type: 'desc' },
+  unitCost: { unitCost: 'asc' },
+  '-unitCost': { unitCost: 'desc' },
+  totalCost: { totalCost: 'asc' },
+  '-totalCost': { totalCost: 'desc' },
   createdAt: { createdAt: 'asc' },
   '-createdAt': { createdAt: 'desc' },
 };

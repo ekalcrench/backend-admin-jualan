@@ -46,6 +46,8 @@ export class InventoryTransactionService {
     return {
       ...transaction,
       quantity: transaction.quantity.toNumber(),
+      unitCost: transaction.unitCost.toNumber(),
+      totalCost: transaction.totalCost.toNumber(),
     };
   }
 }

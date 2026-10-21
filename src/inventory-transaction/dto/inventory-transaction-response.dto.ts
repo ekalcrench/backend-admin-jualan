@@ -21,6 +21,9 @@ export class InventoryTransactionResponseDto extends BaseResponseDto {
   @ApiProperty({ format: 'uuid' })
   inventoryItemId!: string;
 
+  @ApiProperty({ format: 'uuid' })
+  inventoryLotId!: string;
+
   @ApiProperty({ format: 'uuid', nullable: true })
   referenceId?: string;
 
@@ -29,6 +32,12 @@ export class InventoryTransactionResponseDto extends BaseResponseDto {
 
   @ApiProperty()
   quantity!: number;
+
+  @ApiProperty()
+  totalCost!: number;
+
+  @ApiProperty()
+  unitCost!: number;
 
   @ApiProperty({ type: InventoryTransactionItemResponseDto })
   inventoryItem!: InventoryTransactionItemResponseDto;
