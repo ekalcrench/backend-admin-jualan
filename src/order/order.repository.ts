@@ -70,6 +70,7 @@ export class OrderRepository {
       });
 
       if (result.count === 1) {
+        await this.applyOrderInventory(transaction, organizationId, id);
         return transaction.order.findFirstOrThrow({
           where: { id, organizationId },
           include: responseInclude,
@@ -147,7 +148,6 @@ export class OrderRepository {
           },
           include: responseInclude,
         });
-        await this.applyOrderInventory(transaction, organizationId, order.id);
         return order;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -268,8 +268,6 @@ export class OrderRepository {
           return currentOrder ? ('paid' as const) : ('not-found' as const);
         }
 
-        await this.clearOrderInventory(transaction, id, organizationId);
-
         if (deletedOrderItemIds.length) {
           await transaction.orderItem.deleteMany({
             where: { orderId: id, id: { in: deletedOrderItemIds } },
@@ -307,7 +305,6 @@ export class OrderRepository {
           data: { totalAmount },
         });
 
-        await this.applyOrderInventory(transaction, organizationId, id);
         return transaction.order.findFirstOrThrow({
           where: { id, organizationId },
           include: responseInclude,
@@ -343,7 +340,6 @@ export class OrderRepository {
           return currentOrder ? ('paid' as const) : ('not-found' as const);
         }
 
-        await this.clearOrderInventory(transaction, id, organizationId);
         await transaction.orderItem.deleteMany({
           where: { orderId: id },
         });
@@ -356,44 +352,6 @@ export class OrderRepository {
     );
   }
 
-  private async clearOrderInventory(
-    transaction: Prisma.TransactionClient,
-    orderId: string,
-    organizationId: string,
-  ) {
-    const items = await transaction.orderItem.findMany({
-      where: { orderId },
-      select: {
-        id: true,
-        inventoryConsumptions: {
-          select: { inventoryLotId: true, quantity: true },
-        },
-      },
-    });
-    const itemIds = items.map((item) => item.id);
-
-    for (const item of items) {
-      for (const consumption of item.inventoryConsumptions) {
-        await transaction.inventoryLot.update({
-          where: { id: consumption.inventoryLotId },
-          data: { remainingQuantity: { increment: consumption.quantity } },
-        });
-      }
-    }
-    if (itemIds.length) {
-      await transaction.inventoryConsumption.deleteMany({
-        where: { orderItemId: { in: itemIds } },
-      });
-    }
-    await transaction.inventoryTransaction.deleteMany({
-      where: {
-        organizationId,
-        referenceId: orderId,
-        type: InventoryTransactionType.SALE,
-      },
-    });
-  }
-
   private async applyOrderInventory(
     transaction: Prisma.TransactionClient,
     organizationId: string,
@@ -402,7 +360,6 @@ export class OrderRepository {
     const items = await transaction.orderItem.findMany({
       where: { orderId },
       select: {
-        id: true,
         quantity: true,
         product: {
           select: {
@@ -445,13 +402,12 @@ export class OrderRepository {
       lots.map((lot) => [lot.id, lot.remainingQuantity]),
     );
     const consumptions: Array<{
-      orderItemId: string;
+      inventoryItemId: string;
       inventoryLotId: string;
       quantity: Prisma.Decimal;
       unitCost: Prisma.Decimal;
       totalCost: Prisma.Decimal;
     }> = [];
-    const transactionQuantities = new Map<string, Prisma.Decimal>();
 
     for (const item of items) {
       for (const ingredient of item.product.productIngredients) {
@@ -469,7 +425,7 @@ export class OrderRepository {
             ? available
             : quantityNeeded;
           consumptions.push({
-            orderItemId: item.id,
+            inventoryItemId: ingredient.inventoryItemId,
             inventoryLotId: lot.id,
             quantity: consumed,
             unitCost: lot.unitCost,
@@ -477,13 +433,6 @@ export class OrderRepository {
           });
           remainingByLotId.set(lot.id, available.minus(consumed));
           quantityNeeded = quantityNeeded.minus(consumed);
-          transactionQuantities.set(
-            ingredient.inventoryItemId,
-            (
-              transactionQuantities.get(ingredient.inventoryItemId) ??
-              new Prisma.Decimal(0)
-            ).plus(consumed),
-          );
           if (quantityNeeded.equals(0)) {
             break;
           }
@@ -518,15 +467,15 @@ export class OrderRepository {
     }
 
     if (consumptions.length) {
-      await transaction.inventoryConsumption.createMany({ data: consumptions });
-    }
-    if (transactionQuantities.size) {
       await transaction.inventoryTransaction.createMany({
-        data: [...transactionQuantities].map(([inventoryItemId, quantity]) => ({
+        data: consumptions.map((consumption) => ({
           organizationId,
-          inventoryItemId,
+          inventoryItemId: consumption.inventoryItemId,
+          inventoryLotId: consumption.inventoryLotId,
           type: InventoryTransactionType.SALE,
-          quantity,
+          quantity: consumption.quantity,
+          unitCost: consumption.unitCost,
+          totalCost: consumption.totalCost,
           referenceId: orderId,
         })),
       });

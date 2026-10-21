@@ -59,8 +59,7 @@ export class OrderController {
   @Post()
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
-    summary:
-      'Create an unpaid order using current product selling prices and reserve its ingredients from inventory',
+    summary: 'Create an unpaid order using current product selling prices',
   })
   @ApiCreatedResponse({ type: OrderResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
@@ -80,7 +79,9 @@ export class OrderController {
   @ApiOperation({ summary: 'Mark an unpaid order as paid' })
   @ApiParam({ name: 'id', description: 'Order UUID' })
   @ApiOkResponse({ type: OrderResponseDto })
-  @ApiConflictResponse({ description: 'Order is already paid' })
+  @ApiConflictResponse({
+    description: 'Order is already paid or there is insufficient inventory',
+  })
   @ApiNotFoundResponse({ description: 'Order not found' })
   markPaid(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.orderService.markPaid(id, request.user);
@@ -90,14 +91,13 @@ export class OrderController {
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Update an unpaid order and rebuild its inventory reservations; use deletedOrderItemIds to remove selected items',
+      'Update an unpaid order; use deletedOrderItemIds to remove selected items',
   })
   @ApiParam({ name: 'id', description: 'Order UUID' })
   @ApiOkResponse({ type: OrderResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiConflictResponse({
-    description:
-      'Paid orders cannot be updated; inventory must be available for all order items',
+    description: 'Paid orders cannot be updated',
   })
   @ApiNotFoundResponse({ description: 'Order or order item not found' })
   update(
@@ -111,7 +111,7 @@ export class OrderController {
   @Delete(':id')
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
-    summary: 'Delete an unpaid order and release its inventory reservations',
+    summary: 'Delete an unpaid order',
   })
   @ApiParam({ name: 'id', description: 'Order UUID' })
   @ApiOkResponse({

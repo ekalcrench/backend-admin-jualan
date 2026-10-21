@@ -54,19 +54,24 @@ export class OrderService {
   }
 
   async markPaid(id: string, context: OrganizationContext) {
-    const result = await this.orderRepository.markPaid(
-      id,
-      this.requireOrganizationId(context),
-    );
+    try {
+      const result = await this.orderRepository.markPaid(
+        id,
+        this.requireOrganizationId(context),
+      );
 
-    if (result === 'not-found') {
-      throw new NotFoundException('Order not found');
-    }
-    if (result === 'already-paid') {
-      throw new ConflictException('Order is already paid');
-    }
+      if (result === 'not-found') {
+        throw new NotFoundException('Order not found');
+      }
+      if (result === 'already-paid') {
+        throw new ConflictException('Order is already paid');
+      }
 
-    return this.toResponse(result);
+      return this.toResponse(result);
+    } catch (error) {
+      this.throwIfInsufficientInventory(error);
+      throw error;
+    }
   }
 
   async create(dto: CreateOrderDto, context: OrganizationContext) {
