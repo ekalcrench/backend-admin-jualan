@@ -64,7 +64,7 @@ export class OrderController {
   @ApiCreatedResponse({ type: OrderResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiConflictResponse({
-    description: 'Insufficient inventory for order items',
+    description: 'Stok untuk inventory item tidak mencukupi',
   })
   @ApiConflictResponse({
     description: 'An order with this number already exists',

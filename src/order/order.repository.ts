@@ -13,7 +13,7 @@ import { roundCost } from '../common/constants/round-cost.constants.js';
 
 export class InsufficientOrderInventoryError extends Error {
   constructor(inventoryItemName: string) {
-    super(`Insufficient inventory for "${inventoryItemName}"`);
+    super(`Stok untuk "${inventoryItemName}" tidak mencukupi`);
     this.name = 'InsufficientOrderInventoryError';
   }
 }
