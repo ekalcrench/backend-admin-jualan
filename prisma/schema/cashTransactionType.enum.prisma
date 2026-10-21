@@ -1,6 +1,8 @@
 enum CashTransactionType {
   PURCHASE
   SALE
+  INVESTMENT
+  PROFIT_SHARING
 
   @@map("cash_transaction_type")
 }
