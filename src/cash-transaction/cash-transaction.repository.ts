@@ -17,13 +17,28 @@ export class CashTransactionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, search, organizationId } = data;
+    const { page, size, sortBy, search, startDate, endDate, organizationId } =
+      data;
     const where: Prisma.CashTransactionWhereInput = {
       organizationId,
       ...(search && {
         description: { contains: search, mode: 'insensitive' },
       }),
     };
+
+    if (startDate || endDate) {
+      const transactionAt: { gte?: Date; lt?: Date } = {};
+      if (startDate) {
+        transactionAt.gte = startDate;
+      }
+      if (endDate) {
+        const endDateExclusive = new Date(endDate);
+        endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() + 1);
+        transactionAt.lt = endDateExclusive;
+      }
+      where.transactionAt = transactionAt;
+    }
+
     const [items, total] = await this.prisma.$transaction([
       this.prisma.cashTransaction.findMany({
         skip: (page - 1) * size,
@@ -47,11 +62,7 @@ export class CashTransactionRepository {
     return this.prisma.cashTransaction.create({ data });
   }
 
-  cashFlowByType(
-    organizationId: string,
-    startDate?: Date,
-    endDate?: Date,
-  ) {
+  cashFlowByType(organizationId: string, startDate?: Date, endDate?: Date) {
     const where: Prisma.CashTransactionWhereInput = { organizationId };
     if (startDate || endDate) {
       const transactionAt: { gte?: Date; lt?: Date } = {};
