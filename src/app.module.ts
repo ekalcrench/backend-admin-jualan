@@ -14,11 +14,13 @@ import { ProductModule } from './product/product.module.js';
 import { OrderModule } from './order/order.module.js';
 import { PreparationModule } from './preparation/preparation.module.js';
 import { InventoryTransactionModule } from './inventory-transaction/inventory-transaction.module.js';
+import { CashTransactionModule } from './cash-transaction/cash-transaction.module.js';
 
 @Module({
   imports: [
     PrismaModule,
     AuthModule,
+    CashTransactionModule,
     InventoryItemModule,
     InventoryLotModule,
     InventoryTransactionModule,

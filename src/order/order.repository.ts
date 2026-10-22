@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  CashTransactionType,
   InventoryTransactionType,
   OrderStatus,
   Prisma,
@@ -71,10 +72,20 @@ export class OrderRepository {
 
       if (result.count === 1) {
         await this.applyOrderInventory(transaction, organizationId, id);
-        return transaction.order.findFirstOrThrow({
+        const order = await transaction.order.findFirstOrThrow({
           where: { id, organizationId },
           include: responseInclude,
         });
+        await transaction.cashTransaction.create({
+          data: {
+            organizationId,
+            type: CashTransactionType.SALE,
+            amount: order.totalAmount,
+            description: `Sale from order ${order.orderNumber}`,
+            referenceId: order.id,
+          },
+        });
+        return order;
       }
 
       const order = await transaction.order.findFirst({

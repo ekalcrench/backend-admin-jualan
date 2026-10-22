@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  CashTransactionType,
   InventoryTransactionType,
   Prisma,
   PurchaseStatus,
@@ -93,6 +94,8 @@ export class PurchaseRepository {
         select: {
           id: true,
           organizationId: true,
+          supplierName: true,
+          invoiceNumber: true,
           purchaseItems: {
             select: {
               id: true,
@@ -107,6 +110,24 @@ export class PurchaseRepository {
               },
             },
           },
+        },
+      });
+
+      const totalCost = purchase.purchaseItems.reduce(
+        (total, item) => total.plus(item.totalCost),
+        new Prisma.Decimal(0),
+      );
+      await transaction.cashTransaction.create({
+        data: {
+          organizationId,
+          type: CashTransactionType.PURCHASE,
+          amount: totalCost,
+          description: purchase.invoiceNumber
+            ? `Purchase ${purchase.invoiceNumber}`
+            : purchase.supplierName
+              ? `Purchase from ${purchase.supplierName}`
+              : 'Finalized purchase',
+          referenceId: purchase.id,
         },
       });
 
