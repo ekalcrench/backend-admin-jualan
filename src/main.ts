@@ -9,6 +9,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  app.setGlobalPrefix('api');
+
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads',
   });
@@ -47,7 +49,7 @@ async function bootstrap() {
 
   SwaggerModule.setup('api', app, document);
 
-  await app.listen(process.env.PORT as string);
+  await app.listen(Number(process.env.PORT ?? 8080), '0.0.0.0');
 }
 
 void bootstrap();

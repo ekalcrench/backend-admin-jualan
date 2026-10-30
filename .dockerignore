@@ -1,0 +1,20 @@
+# Ignore dependencies and build output
+node_modules/
+dist/
+
+# Ignore environment and config files (sensitive data)
+.env
+
+# Ignore local development files
+.git/
+.gitignore
+.vscode/
+.github/
+.agents/
+.claude/
+.windsurf/
+.prettierrc
+
+# Ignore Docker-related files (to avoid copying unnecessary configs)
+Dockerfile
+.dockerignore
