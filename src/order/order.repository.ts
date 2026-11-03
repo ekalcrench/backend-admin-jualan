@@ -163,10 +163,16 @@ export class OrderRepository {
           new Prisma.Decimal(0),
         );
 
+        const totalQuantity = items.reduce(
+          (total, item) => total + item.quantity,
+          0,
+        );
+
         const order = await transaction.order.create({
           data: {
             orderNumber,
             totalAmount,
+            totalQuantity,
             status: OrderStatus.UNPAID,
             organization: { connect: { id: organizationId } },
             items: { create: items },
@@ -324,10 +330,14 @@ export class OrderRepository {
           (total, item) => total.plus(item.unitPrice.mul(item.quantity)),
           new Prisma.Decimal(0),
         );
+        const totalQuantity = currentItems.reduce(
+          (total, item) => total + item.quantity,
+          0,
+        );
 
         await transaction.order.update({
           where: { id },
-          data: { totalAmount },
+          data: { totalAmount, totalQuantity },
         });
 
         return transaction.order.findFirstOrThrow({

@@ -35,6 +35,9 @@ export class OrderResponseDto extends BaseResponseDto {
   @ApiProperty({ minimum: 0 })
   totalAmount!: number;
 
+  @ApiProperty({ minimum: 0 })
+  totalQuantity!: number;
+
   @ApiProperty({ enum: OrderStatus })
   status!: OrderStatus;
 

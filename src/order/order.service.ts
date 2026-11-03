@@ -18,6 +18,7 @@ import { OrderItemChange } from './types/order-item-change.type.js';
 import { OrganizationContext } from '../common/types/organization-context.types.js';
 import { ProductByIdRecord } from './types/product-by-id-record-types.js';
 import { OrderRecord } from './types/order-record.types.js';
+import { OrderResponseDto } from './dto/order-response.dto.js';
 
 @Injectable()
 export class OrderService {
@@ -256,12 +257,13 @@ export class OrderService {
     };
   }
 
-  private toResponse(order: OrderRecord) {
+  private toResponse(order: OrderRecord): OrderResponseDto {
     return {
       id: order.id,
       organizationId: order.organizationId,
       orderNumber: order.orderNumber,
       totalAmount: order.totalAmount.toNumber(),
+      totalQuantity: order.totalQuantity,
       status: order.status,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
