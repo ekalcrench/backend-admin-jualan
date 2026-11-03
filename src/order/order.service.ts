@@ -24,6 +24,16 @@ export class OrderService {
   constructor(private readonly orderRepository: OrderRepository) {}
 
   async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
+    if (
+      dto.startDate &&
+      dto.endDate &&
+      dto.startDate.getTime() > dto.endDate.getTime()
+    ) {
+      throw new BadRequestException(
+        'startDate must be before or equal to endDate',
+      );
+    }
+
     const organizationId = this.requireOrganizationId(context);
     const { items, total } = await this.orderRepository.findByPages({
       ...dto,

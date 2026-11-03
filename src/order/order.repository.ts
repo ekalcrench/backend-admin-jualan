@@ -24,7 +24,8 @@ export class OrderRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, search, organizationId } = data;
+    const { page, size, sortBy, search, startDate, endDate, organizationId } =
+      data;
     const skip = (page - 1) * size;
     const where: Prisma.OrderWhereInput = {
       organizationId,
@@ -41,6 +42,19 @@ export class OrderRepository {
         ],
       }),
     };
+
+    if (startDate || endDate) {
+      const createdAt: { gte?: Date; lt?: Date } = {};
+      if (startDate) {
+        createdAt.gte = startDate;
+      }
+      if (endDate) {
+        const endDateExclusive = new Date(endDate);
+        endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() + 1);
+        createdAt.lt = endDateExclusive;
+      }
+      where.createdAt = createdAt;
+    }
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.order.findMany({
