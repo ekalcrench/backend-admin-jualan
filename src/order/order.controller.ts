@@ -25,6 +25,9 @@ import { CreateOrderDto } from './dto/create-order.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { OrderGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { OrderResponseDto } from './dto/order-response.dto.js';
+import { GetOrderOverviewDto } from './dto/get-overview.dto.js';
+import { OrderOverviewResponseDto } from './dto/order-overview-response.dto.js';
+import { OrderOverviewItemsResponseDto } from './dto/order-overview-items-response.dto.js';
 import { UpdateOrderDto } from './dto/update-order.dto.js';
 import { OrderService } from './order.service.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
@@ -44,6 +47,30 @@ export class OrderController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.orderService.findByPages(query, request.user);
+  }
+
+  @Get('overview')
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
+  @ApiOperation({ summary: 'Retrieve overview for orders' })
+  @ApiOkResponse({ type: OrderOverviewResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid date range' })
+  getOverview(
+    @Query() query: GetOrderOverviewDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.orderService.getOverview(query, request.user);
+  }
+
+  @Get('overview-items')
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
+  @ApiOperation({ summary: 'Retrieve the most and least sold order items' })
+  @ApiOkResponse({ type: OrderOverviewItemsResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid date range' })
+  getOverviewItems(
+    @Query() query: GetOrderOverviewDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.orderService.getOverviewItems(query, request.user);
   }
 
   @Get(':id')

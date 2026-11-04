@@ -12,6 +12,9 @@ export class OrderItemResponseDto {
   @ApiProperty({ minimum: 0 })
   unitPrice!: number;
 
+  @ApiProperty({ minimum: 0 })
+  unitCost!: number;
+
   @ApiProperty({
     type: 'object',
     properties: {

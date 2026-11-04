@@ -5,6 +5,7 @@ model OrderItem {
 
   quantity  Int
   unitPrice Decimal @map("unit_price") @db.Decimal(15, 2)
+  unitCost  Decimal @default(0) @map("unit_cost") @db.Decimal(15, 3)
 
   // Relationships
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)

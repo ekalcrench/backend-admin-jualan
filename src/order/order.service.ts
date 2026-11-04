@@ -19,10 +19,132 @@ import { OrganizationContext } from '../common/types/organization-context.types.
 import { ProductByIdRecord } from './types/product-by-id-record-types.js';
 import { OrderRecord } from './types/order-record.types.js';
 import { OrderResponseDto } from './dto/order-response.dto.js';
+import { GetOrderOverviewDto } from './dto/get-overview.dto.js';
 
 @Injectable()
 export class OrderService {
   constructor(private readonly orderRepository: OrderRepository) {}
+
+  async getOverview(dto: GetOrderOverviewDto, context: OrganizationContext) {
+    if (
+      dto.startDate &&
+      dto.endDate &&
+      dto.startDate.getTime() > dto.endDate.getTime()
+    ) {
+      throw new BadRequestException(
+        'startDate must be before or equal to endDate',
+      );
+    }
+    if (Boolean(dto.startDate) !== Boolean(dto.endDate)) {
+      throw new BadRequestException(
+        'startDate and endDate must be sent together',
+      );
+    }
+
+    if (!dto.startDate || !dto.endDate) {
+      const [totals, totalUnitCost] =
+        await this.orderRepository.getOverviewWithoutDateRange(
+          this.requireOrganizationId(context),
+        );
+      const totalAmount = totals._sum.totalAmount ?? new Prisma.Decimal(0);
+      return {
+        totalAmount: totalAmount.toNumber(),
+        totalQuantity: totals._sum.totalQuantity ?? 0,
+        totalGrossProfit: totalAmount.minus(totalUnitCost).toNumber(),
+        prevTotalAmount: 0,
+        prevTotalQuantity: 0,
+        prevTotalGrossProfit: 0,
+      };
+    }
+
+    const [totals, previousOverviews, totalUnitCost, previousTotalUnitCost] =
+      await this.orderRepository.getOverviewWithDateRange(
+        this.requireOrganizationId(context),
+        dto.startDate,
+        dto.endDate,
+      );
+
+    const totalAmount = totals._sum.totalAmount ?? new Prisma.Decimal(0);
+    const previousAmount =
+      previousOverviews._sum.totalAmount ?? new Prisma.Decimal(0);
+
+    return {
+      totalAmount: totalAmount.toNumber(),
+      totalQuantity: totals._sum.totalQuantity ?? 0,
+      totalGrossProfit: totalAmount.minus(totalUnitCost).toNumber(),
+      prevTotalAmount: previousAmount.toNumber(),
+      prevTotalQuantity: previousOverviews._sum.totalQuantity ?? 0,
+      prevTotalGrossProfit: previousAmount
+        .minus(previousTotalUnitCost)
+        .toNumber(),
+    };
+  }
+
+  async getOverviewItems(
+    dto: GetOrderOverviewDto,
+    context: OrganizationContext,
+  ) {
+    if (
+      dto.startDate &&
+      dto.endDate &&
+      dto.startDate.getTime() > dto.endDate.getTime()
+    ) {
+      throw new BadRequestException(
+        'startDate must be before or equal to endDate',
+      );
+    }
+
+    const items = await this.orderRepository.getOverviewItems(
+      this.requireOrganizationId(context),
+      dto.startDate,
+      dto.endDate,
+    );
+
+    if (!items.length) {
+      return {
+        mostSellItemsAmount: 0,
+        mostSellItemsName: '',
+        mostSellItemsLatestSold: '',
+        leastSellItemsAmount: 0,
+        leastSellItemsName: '',
+        leastSellItemsLatestSold: '',
+      };
+    }
+
+    const soldByProduct = new Map<
+      string,
+      { name: string; amount: number; latestSold: Date }
+    >();
+    for (const item of items) {
+      const current = soldByProduct.get(item.productId);
+      const latestSold =
+        current && current.latestSold > item.order.createdAt
+          ? current.latestSold
+          : item.order.createdAt;
+      soldByProduct.set(item.productId, {
+        name: item.product.name,
+        amount: (current?.amount ?? 0) + item.quantity,
+        latestSold,
+      });
+    }
+
+    const soldItems = [...soldByProduct.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+    const highestAmount = Math.max(...soldItems.map((item) => item.amount));
+    const lowestAmount = Math.min(...soldItems.map((item) => item.amount));
+    const mostSold = soldItems.find((item) => item.amount === highestAmount)!;
+    const leastSold = soldItems.find((item) => item.amount === lowestAmount)!;
+
+    return {
+      mostSellItemsAmount: mostSold.amount,
+      mostSellItemsName: mostSold.name,
+      mostSellItemsLatestSold: mostSold.latestSold.toISOString(),
+      leastSellItemsAmount: leastSold.amount,
+      leastSellItemsName: leastSold.name,
+      leastSellItemsLatestSold: leastSold.latestSold.toISOString(),
+    };
+  }
 
   async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
     if (
@@ -271,6 +393,7 @@ export class OrderService {
         id: item.id,
         quantity: item.quantity,
         unitPrice: item.unitPrice.toNumber(),
+        unitCost: item.unitCost.toNumber(),
         product: item.product,
       })),
     };

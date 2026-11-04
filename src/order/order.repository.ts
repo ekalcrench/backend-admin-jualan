@@ -23,6 +23,109 @@ export class InsufficientOrderInventoryError extends Error {
 export class OrderRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  getOverviewItems(
+    organizationId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ) {
+    const createdAt: { gte?: Date; lt?: Date } = {};
+    if (startDate) {
+      createdAt.gte = startDate;
+    }
+    if (endDate) {
+      const endDateExclusive = new Date(endDate);
+      endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() + 1);
+      createdAt.lt = endDateExclusive;
+    }
+
+    return this.prisma.orderItem.findMany({
+      where: {
+        order: {
+          is: {
+            organizationId,
+            status: OrderStatus.PAID,
+            ...(startDate || endDate ? { createdAt } : {}),
+          },
+        },
+      },
+      select: {
+        productId: true,
+        quantity: true,
+        product: { select: { name: true } },
+        order: { select: { createdAt: true } },
+      },
+    });
+  }
+
+  getOverviewWithoutDateRange(organizationId: string) {
+    return Promise.all([
+      this.prisma.order.aggregate({
+        where: { organizationId, status: OrderStatus.PAID },
+        _sum: { totalAmount: true, totalQuantity: true },
+      }),
+      this.getTotalUnitCost({
+        organizationId,
+      }),
+    ]);
+  }
+
+  getOverviewWithDateRange(
+    organizationId: string,
+    startDate: Date,
+    endDate: Date,
+  ) {
+    const currentEndExclusive = new Date(endDate);
+    currentEndExclusive.setUTCDate(currentEndExclusive.getUTCDate() + 1);
+
+    const periodDuration = currentEndExclusive.getTime() - startDate.getTime();
+    const previousStart = new Date(startDate.getTime() - periodDuration);
+
+    return Promise.all([
+      this.prisma.order.aggregate({
+        where: {
+          organizationId,
+          status: OrderStatus.PAID,
+          createdAt: { gte: startDate, lt: currentEndExclusive },
+        },
+        _sum: {
+          totalAmount: true,
+          totalQuantity: true,
+        },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          organizationId,
+          status: OrderStatus.PAID,
+          createdAt: { gte: previousStart, lt: startDate },
+        },
+        _sum: {
+          totalAmount: true,
+          totalQuantity: true,
+        },
+      }),
+      this.getTotalUnitCost({
+        organizationId,
+        createdAt: { gte: startDate, lt: currentEndExclusive },
+      }),
+      this.getTotalUnitCost({
+        organizationId,
+        createdAt: { gte: previousStart, lt: startDate },
+      }),
+    ]);
+  }
+
+  private async getTotalUnitCost(where: Prisma.OrderWhereInput) {
+    const items = await this.prisma.orderItem.findMany({
+      where: { order: { is: { ...where, status: OrderStatus.PAID } } },
+      select: { quantity: true, unitCost: true },
+    });
+
+    return items.reduce(
+      (total, item) => total.plus(item.unitCost.mul(item.quantity)),
+      new Prisma.Decimal(0),
+    );
+  }
+
   async findByPages(data: FindByPagesParams) {
     const { page, size, sortBy, search, startDate, endDate, organizationId } =
       data;
@@ -132,7 +235,13 @@ export class OrderRepository {
         ];
         const products = await transaction.product.findMany({
           where: { organizationId, id: { in: productIds } },
-          select: { id: true, sellingPrice: true },
+          select: {
+            id: true,
+            sellingPrice: true,
+            productIngredients: {
+              select: { inventoryItemId: true, quantity: true },
+            },
+          },
         });
         if (products.length !== productIds.length) {
           return 'product-not-found' as const;
@@ -141,16 +250,22 @@ export class OrderRepository {
         const sellingPriceByProductId = new Map(
           products.map((product) => [product.id, product.sellingPrice]),
         );
+        const unitCostByProductId = await this.getProductUnitCosts(
+          transaction,
+          products,
+        );
         const items: Prisma.OrderItemCreateWithoutOrderInput[] = [];
         for (const { productId, quantity } of orderItems) {
           const unitPrice = sellingPriceByProductId.get(productId);
-          if (unitPrice === undefined) {
+          const unitCost = unitCostByProductId.get(productId);
+          if (unitPrice === undefined || unitCost === undefined) {
             return 'product-not-found' as const;
           }
           items.push({
             product: { connect: { id: productId } },
             quantity,
             unitPrice,
+            unitCost,
           });
         }
 
@@ -253,7 +368,13 @@ export class OrderRepository {
 
         const products = await transaction.product.findMany({
           where: { organizationId, id: { in: targetProductIds } },
-          select: { id: true, sellingPrice: true },
+          select: {
+            id: true,
+            sellingPrice: true,
+            productIngredients: {
+              select: { inventoryItemId: true, quantity: true },
+            },
+          },
         });
         if (products.length !== targetProductIds.length) {
           return 'product-not-found' as const;
@@ -261,9 +382,14 @@ export class OrderRepository {
         const sellingPriceByProductId = new Map(
           products.map((product) => [product.id, product.sellingPrice]),
         );
+        const unitCostByProductId = await this.getProductUnitCosts(
+          transaction,
+          products,
+        );
         const pricedChanges: Array<{
           item: OrderItemChange;
           unitPrice: Prisma.Decimal;
+          unitCost: Prisma.Decimal;
         }> = [];
         for (const item of itemChanges) {
           const productId = productIdByChange.get(item);
@@ -271,10 +397,11 @@ export class OrderRepository {
             return 'related-record-not-found' as const;
           }
           const unitPrice = sellingPriceByProductId.get(productId);
-          if (unitPrice === undefined) {
+          const unitCost = unitCostByProductId.get(productId);
+          if (unitPrice === undefined || unitCost === undefined) {
             return 'product-not-found' as const;
           }
-          pricedChanges.push({ item, unitPrice });
+          pricedChanges.push({ item, unitPrice, unitCost });
         }
 
         if (deletedOrderItemIds.length) {
@@ -305,17 +432,18 @@ export class OrderRepository {
           });
         }
 
-        for (const { item, unitPrice } of pricedChanges) {
+        for (const { item, unitPrice, unitCost } of pricedChanges) {
           if (item.id) {
             await transaction.orderItem.update({
               where: { id: item.id },
-              data: { ...item.itemData, unitPrice },
+              data: { ...item.itemData, unitPrice, unitCost },
             });
           } else if (item.createData) {
             await transaction.orderItem.create({
               data: {
                 ...item.createData,
                 unitPrice,
+                unitCost,
                 order: { connect: { id } },
               },
             });
@@ -385,6 +513,87 @@ export class OrderRepository {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+  }
+
+  private async getProductUnitCosts(
+    transaction: Prisma.TransactionClient,
+    products: Array<{
+      id: string;
+      productIngredients: Array<{
+        inventoryItemId: string;
+        quantity: Prisma.Decimal;
+      }>;
+    }>,
+  ) {
+    const inventoryItemIds = [
+      ...new Set(
+        products.flatMap((product) =>
+          product.productIngredients.map(
+            (ingredient) => ingredient.inventoryItemId,
+          ),
+        ),
+      ),
+    ];
+    const lots = inventoryItemIds.length
+      ? await transaction.inventoryLot.findMany({
+          where: {
+            inventoryItemId: { in: inventoryItemIds },
+            remainingQuantity: { gt: 0 },
+          },
+          orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
+          select: {
+            inventoryItemId: true,
+            remainingQuantity: true,
+            unitCost: true,
+          },
+        })
+      : [];
+
+    const lotsByInventoryItemId = new Map<
+      string,
+      Array<{ remainingQuantity: Prisma.Decimal; unitCost: Prisma.Decimal }>
+    >();
+    for (const lot of lots) {
+      const itemLots = lotsByInventoryItemId.get(lot.inventoryItemId) ?? [];
+      itemLots.push(lot);
+      lotsByInventoryItemId.set(lot.inventoryItemId, itemLots);
+    }
+
+    const unitCostByProductId = new Map<string, Prisma.Decimal>();
+    for (const product of products) {
+      let productUnitCost = new Prisma.Decimal(0);
+      for (const ingredient of product.productIngredients) {
+        let quantityNeeded = ingredient.quantity;
+        let ingredientCost = new Prisma.Decimal(0);
+        let quantityCosted = new Prisma.Decimal(0);
+
+        for (const lot of lotsByInventoryItemId.get(
+          ingredient.inventoryItemId,
+        ) ?? []) {
+          if (quantityNeeded.lessThanOrEqualTo(0)) {
+            break;
+          }
+          const consumed = lot.remainingQuantity.lessThan(quantityNeeded)
+            ? lot.remainingQuantity
+            : quantityNeeded;
+          ingredientCost = ingredientCost.plus(lot.unitCost.mul(consumed));
+          quantityCosted = quantityCosted.plus(consumed);
+          quantityNeeded = quantityNeeded.minus(consumed);
+        }
+
+        if (quantityCosted.greaterThan(0)) {
+          productUnitCost = productUnitCost.plus(
+            roundCost(
+              ingredientCost.div(quantityCosted).mul(ingredient.quantity),
+              3,
+            ),
+          );
+        }
+      }
+      unitCostByProductId.set(product.id, roundCost(productUnitCost, 3));
+    }
+
+    return unitCostByProductId;
   }
 
   private async applyOrderInventory(
