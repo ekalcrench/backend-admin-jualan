@@ -62,8 +62,27 @@ export class CashTransactionRepository {
     return this.prisma.cashTransaction.create({ data });
   }
 
+  balance(organizationId: string, endDate?: Date) {
+    const where: Prisma.CashTransactionWhereInput = { organizationId };
+
+    if (endDate) {
+      const transactionAt: { lt?: Date } = {};
+      const endDateExclusive = new Date(endDate);
+      endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() + 1);
+      transactionAt.lt = endDateExclusive;
+      where.transactionAt = transactionAt;
+    }
+
+    return this.prisma.cashTransaction.groupBy({
+      by: ['type'],
+      where,
+      _sum: { amount: true },
+    });
+  }
+
   cashFlowByType(organizationId: string, startDate?: Date, endDate?: Date) {
     const where: Prisma.CashTransactionWhereInput = { organizationId };
+
     if (startDate || endDate) {
       const transactionAt: { gte?: Date; lt?: Date } = {};
       if (startDate) {

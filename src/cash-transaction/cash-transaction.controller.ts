@@ -29,6 +29,9 @@ import { CreateCashTransactionDto } from './dto/create-cash-transaction.dto.js';
 import { GetBalanceDto } from './dto/get-balance.dto.js';
 import { UpdateCashTransactionDto } from './dto/update-cash-transaction.dto.js';
 import { CashTransactionService } from './cash-transaction.service.js';
+import { GetCashFlowDto } from './dto/get-cash-flow.dto.js';
+import { GetBalanceResponseDto } from './dto/get-balance-response.dto.js';
+import { GetCashFlowResponseDto } from './dto/get-cash-flow-response.dto.js';
 
 @ApiTags('cash-transactions')
 @Controller('cash-transactions')
@@ -60,23 +63,28 @@ export class CashTransactionController {
     OrganizationUserRole.MEMBER,
   )
   @ApiOperation({ summary: 'Retrieve the organization cash balance' })
-  @ApiOkResponse({
-    schema: {
-      type: 'object',
-      properties: {
-        remainingCash: { type: 'number' },
-        cashIn: { type: 'number' },
-        cashOut: { type: 'number' },
-        netCashFlow: { type: 'number' },
-      },
-    },
-  })
-  @ApiBadRequestResponse({ description: 'Invalid date range' })
+  @ApiOkResponse({ type: GetBalanceResponseDto })
   getBalance(
     @Query() query: GetBalanceDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.cashTransactionService.getBalance(query, request.user);
+  }
+
+  @Get('cash-flow')
+  @OrganizationRoles(
+    OrganizationUserRole.OWNER,
+    OrganizationUserRole.ADMIN,
+    OrganizationUserRole.MEMBER,
+  )
+  @ApiOperation({ summary: 'Retrieve the organization cash flow' })
+  @ApiOkResponse({ type: GetCashFlowResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid date range' })
+  getCashFlow(
+    @Query() query: GetCashFlowDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.cashTransactionService.getCashFlow(query, request.user);
   }
 
   @Get(':id')

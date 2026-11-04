@@ -14,6 +14,9 @@ import { GetBalanceDto } from './dto/get-balance.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdateCashTransactionDto } from './dto/update-cash-transaction.dto.js';
 import { CashTransactionRepository } from './cash-transaction.repository.js';
+import { GetCashFlowDto } from './dto/get-cash-flow.dto.js';
+import { GetBalanceResponseDto } from './dto/get-balance-response.dto.js';
+import { GetCashFlowResponseDto } from './dto/get-cash-flow-response.dto.js';
 
 @Injectable()
 export class CashTransactionService {
@@ -50,7 +53,36 @@ export class CashTransactionService {
     return this.toResponse(transaction);
   }
 
-  async getBalance(dto: GetBalanceDto, context: OrganizationContext) {
+  async getBalance(
+    dto: GetBalanceDto,
+    context: OrganizationContext,
+  ): Promise<GetBalanceResponseDto> {
+    const balances = await this.cashTransactionRepository.balance(
+      this.requireOrganizationId(context),
+      dto.endDate,
+    );
+
+    const total = balances.reduce((sum, group) => {
+      const amount = group._sum.amount ?? new Prisma.Decimal(0);
+      switch (group.type) {
+        case CashTransactionType.PURCHASE:
+        case CashTransactionType.PROFIT_SHARING:
+          return sum.minus(amount);
+        case CashTransactionType.SALE:
+        case CashTransactionType.INVESTMENT:
+          return sum.plus(amount);
+      }
+    }, new Prisma.Decimal(0));
+
+    return {
+      balance: total.toNumber(),
+    };
+  }
+
+  async getCashFlow(
+    dto: GetCashFlowDto,
+    context: OrganizationContext,
+  ): Promise<GetCashFlowResponseDto> {
     if (
       dto.startDate &&
       dto.endDate &&
@@ -66,39 +98,80 @@ export class CashTransactionService {
       dto.startDate,
       dto.endDate,
     );
-    const totals = cashFlow.reduce(
+    const previousRange = this.getPreviousDateRange(dto.startDate, dto.endDate);
+    const previousCashFlow = previousRange
+      ? await this.cashTransactionRepository.cashFlowByType(
+          this.requireOrganizationId(context),
+          previousRange.startDate,
+          previousRange.endDate,
+        )
+      : [];
+    const totals = this.sumCashFlow(cashFlow);
+    const previousTotals = this.sumCashFlow(previousCashFlow);
+
+    return {
+      cashIn: totals.cashIn.toNumber(),
+      cashOut: totals.cashOut.toNumber(),
+      prevCashIn: previousTotals.cashIn.toNumber(),
+      prevCashOut: previousTotals.cashOut.toNumber(),
+    };
+  }
+
+  private sumCashFlow(
+    cashFlow: Array<{
+      type: CashTransactionType;
+      _sum: { amount: Prisma.Decimal | null };
+    }>,
+  ) {
+    return cashFlow.reduce(
       (result, group) => {
-        const amount = group._sum.amount ?? new Prisma.Decimal(0);
-        if (
-          group.type === CashTransactionType.SALE ||
-          group.type === CashTransactionType.INVESTMENT
-        ) {
-          result.cashIn = result.cashIn.plus(amount);
-        } else {
-          result.cashOut = result.cashOut.plus(amount);
-        }
-        if (
-          group.type === CashTransactionType.PURCHASE ||
-          group.type === CashTransactionType.INVESTMENT
-        ) {
-          result.remainingCash = result.remainingCash.plus(amount);
-        } else {
-          result.remainingCash = result.remainingCash.minus(amount);
+        const amount = group._sum?.amount ?? new Prisma.Decimal(0);
+        switch (group.type) {
+          case CashTransactionType.PURCHASE:
+          case CashTransactionType.PROFIT_SHARING:
+            result.cashOut = result.cashOut.plus(amount);
+            break;
+          case CashTransactionType.SALE:
+          case CashTransactionType.INVESTMENT:
+            result.cashIn = result.cashIn.plus(amount);
+            break;
         }
         return result;
       },
       {
-        remainingCash: new Prisma.Decimal(0),
         cashIn: new Prisma.Decimal(0),
         cashOut: new Prisma.Decimal(0),
       },
     );
+  }
+
+  private getPreviousDateRange(
+    startDate?: Date,
+    endDate?: Date,
+  ): { startDate?: Date; endDate?: Date } | undefined {
+    if (!startDate && !endDate) {
+      return undefined;
+    }
+
+    if (startDate && endDate) {
+      const currentEndExclusive = new Date(endDate);
+      currentEndExclusive.setUTCDate(currentEndExclusive.getUTCDate() + 1);
+      const periodDuration =
+        currentEndExclusive.getTime() - startDate.getTime();
+
+      return {
+        startDate: new Date(startDate.getTime() - periodDuration),
+        endDate: new Date(startDate.getTime() - 1),
+      };
+    }
+
+    if (startDate) {
+      return { endDate: new Date(startDate.getTime() - 1) };
+    }
 
     return {
-      remainingCash: totals.remainingCash.toNumber(),
-      cashIn: totals.cashIn.toNumber(),
-      cashOut: totals.cashOut.toNumber(),
-      netCashFlow: totals.cashIn.minus(totals.cashOut).toNumber(),
+      startDate: new Date(endDate!.getTime() - 86_400_000),
+      endDate: new Date(endDate!.getTime() - 86_400_000),
     };
   }
 
