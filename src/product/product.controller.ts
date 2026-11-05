@@ -29,6 +29,7 @@ import { ProductResponseDto } from './dto/product-response.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { ProductService } from './product.service.js';
 import { ProductOptionsResponseDto } from './dto/product-options-response.dto.js';
+import { ProductOverviewResponseDto } from './dto/product-overview-response.dto.js';
 
 @ApiTags('products')
 @Controller('products')
@@ -57,6 +58,18 @@ export class ProductController {
   @ApiOkResponse({ type: ProductOptionsResponseDto, isArray: true })
   findOptions(@Req() request: Request & { user: { organizationId?: string } }) {
     return this.productService.findOptions(request.user);
+  }
+
+  @Get('lowest-stocks')
+  @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Retrieve products with the lowest available stock',
+  })
+  @ApiOkResponse({ type: ProductOverviewResponseDto, isArray: true })
+  findOverview(
+    @Req() request: Request & { user: { organizationId?: string } },
+  ) {
+    return this.productService.findOverview(request.user);
   }
 
   @Get(':id')

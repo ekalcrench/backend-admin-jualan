@@ -13,6 +13,7 @@ import { UpdateProductDto } from './dto/update-product.dto.js';
 import { ProductRepository } from './product.repository.js';
 import { ProductIngredientChange } from './types/product-ingredient-change.type.js';
 import { ProductOptionsResponseDto } from './dto/product-options-response.dto.js';
+import { ProductOverviewResponseDto } from './dto/product-overview-response.dto.js';
 import { ProductRecord } from './types/product-record.types.js';
 import { ProductOptionsRecord } from './types/product-options-record.types.js';
 import { OrganizationContext } from '../common/types/organization-context.types.js';
@@ -64,6 +65,37 @@ export class ProductService {
     return products.map((product) =>
       this.toOptionsResponse(product, remainingStockByInventoryItemId),
     );
+  }
+
+  async findOverview(
+    context: OrganizationContext,
+  ): Promise<ProductOverviewResponseDto[]> {
+    const products = await this.productRepository.findOverview(
+      this.requireOrganizationId(context),
+    );
+    const remainingStockByInventoryItemId =
+      await this.getRemainingStockByInventoryItemIds(
+        products.flatMap((product) =>
+          product.productIngredients.map(
+            (ingredient) => ingredient.inventoryItemId,
+          ),
+        ),
+      );
+
+    if (!products.length) {
+      return [];
+    }
+
+    const stocks = products.map((product) => ({
+      name: product.name,
+      stock: this.calculateStock(
+        product.productIngredients,
+        remainingStockByInventoryItemId,
+      ),
+    }));
+    const lowestStock = Math.min(...stocks.map(({ stock }) => stock));
+
+    return stocks.filter(({ stock }) => stock === lowestStock);
   }
 
   async findById(id: string, context: OrganizationContext) {

@@ -53,6 +53,10 @@ export class ProductRepository {
     });
   }
 
+  findOverview(organizationId: string) {
+    return this.findOptions(organizationId);
+  }
+
   findRemainingStockByInventoryItemIds(ids: string[]) {
     if (!ids.length) {
       return [];
