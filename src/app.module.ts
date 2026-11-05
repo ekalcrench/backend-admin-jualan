@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'node:path';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { UserModule } from './user/user.module.js';
 import { OrganizationModule } from './organization/organization.module.js';
@@ -31,10 +29,6 @@ import { CashTransactionModule } from './cash-transaction/cash-transaction.modul
     ProductModule,
     PurchaseModule,
     UserModule,
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
-    }),
     ...(process.env.NODE_ENV === 'development' ? [InitModule] : []),
   ],
 })
