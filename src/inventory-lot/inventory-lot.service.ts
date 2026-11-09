@@ -1,5 +1,10 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { GetInventoryLotsByPagesDto } from './dto/get-inventory-lots-by-pages.dto.js';
+import { UpdateInventoryLotDto } from './dto/update-inventory-lot.dto.js';
 import { InventoryLotRepository } from './inventory-lot.repository.js';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
 import { UserRequestHeader } from '../common/types/user-request-header.types.js';
@@ -29,6 +34,34 @@ export class InventoryLotService {
         totalPages: Math.ceil(total / dto.size),
       },
     };
+  }
+
+  async update(
+    id: string,
+    dto: UpdateInventoryLotDto,
+    userHeader: UserRequestHeader,
+  ) {
+    const lot = await this.inventoryLotRepository.update(
+      id,
+      this.requireOrganizationId(userHeader),
+      {
+        ...(dto.remainingQuantity !== undefined && {
+          remainingQuantity: new Prisma.Decimal(dto.remainingQuantity),
+        }),
+        ...(dto.receivedAt !== undefined && {
+          receivedAt: new Date(dto.receivedAt),
+        }),
+        ...(dto.expiredAt !== undefined && {
+          expiredAt: dto.expiredAt === null ? null : new Date(dto.expiredAt),
+        }),
+      },
+    );
+
+    if (!lot) {
+      throw new NotFoundException('Inventory lot not found');
+    }
+
+    return this.toResponse(lot);
   }
 
   private requireOrganizationId(userHeader: UserRequestHeader) {
