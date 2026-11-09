@@ -1,12 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { OrganizationRepository } from './organization.repository.js';
 import { CreateOrganizationDto } from './dto/create-organization.dto.js';
 import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
-import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { FileUpload } from '../common/types/file-upload.types.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { MAX_LOGO_BASE64_SIZE } from '../common/constants/organization.constants.js';
 
 @Injectable()
 export class OrganizationService {
@@ -38,84 +40,34 @@ export class OrganizationService {
     return org;
   }
 
-  async create(dto: CreateOrganizationDto, file: FileUpload) {
+  async create(dto: CreateOrganizationDto) {
     const organizationId = randomUUID();
-    const uploadDirectory = join(
-      process.cwd(),
-      'uploads',
-      'organizations',
-      organizationId,
-    );
-    const fileName = file.originalname;
-    const filePath = join(uploadDirectory, fileName);
-    const logoUrl = `/uploads/organizations/${organizationId}/${fileName}`;
+    const logoBase64 = this.validateLogoBase64(dto.logoBase64);
 
-    mkdirSync(uploadDirectory, { recursive: true });
-    writeFileSync(filePath, file.buffer);
-
-    try {
-      return await this.organizationRepository.create({
-        ...dto,
-        id: organizationId,
-        logoUrl,
-      });
-    } catch (error) {
-      if (existsSync(filePath)) {
-        unlinkSync(filePath);
-      }
-
-      throw error;
+    if (!logoBase64) {
+      throw new BadRequestException('logoBase64 is required.');
     }
+
+    return this.organizationRepository.create({
+      ...dto,
+      id: organizationId,
+      logoBase64,
+    });
   }
 
-  async update(id: string, dto: UpdateOrganizationDto, file?: FileUpload) {
+  async update(id: string, dto: UpdateOrganizationDto) {
     const existing = await this.organizationRepository.findById(id);
 
     if (!existing) {
       throw new NotFoundException('Organization not found');
     }
 
-    let filePath: string | undefined;
-    let logoUrl: string | undefined;
+    const logoBase64 = this.validateLogoBase64(dto.logoBase64);
 
-    if (file) {
-      const uploadDirectory = join(
-        process.cwd(),
-        'uploads',
-        'organizations',
-        id,
-      );
-      const fileName = file.originalname;
-      filePath = join(uploadDirectory, fileName);
-      logoUrl = `/uploads/organizations/${id}/${fileName}`;
-
-      mkdirSync(uploadDirectory, { recursive: true });
-      writeFileSync(filePath, file.buffer);
-    }
-
-    try {
-      const org = await this.organizationRepository.update(id, {
-        ...dto,
-        ...(logoUrl && { logoUrl }),
-      });
-
-      // DB berhasil → hapus logo lama
-      if (file && existing.logoUrl) {
-        const oldFilePath = join(process.cwd(), existing.logoUrl);
-
-        if (existsSync(oldFilePath)) {
-          unlinkSync(oldFilePath);
-        }
-      }
-
-      return org;
-    } catch (error) {
-      if (filePath && existsSync(filePath)) {
-        unlinkSync(filePath);
-      }
-
-      throw error;
-    }
+    return this.organizationRepository.update(id, {
+      ...dto,
+      ...(logoBase64 !== undefined && { logoBase64 }),
+    });
   }
 
   async delete(id: string) {
@@ -128,5 +80,18 @@ export class OrganizationService {
     await this.organizationRepository.delete(id);
 
     return true;
+  }
+
+  private validateLogoBase64(logoBase64: string | undefined) {
+    if (
+      logoBase64 !== undefined &&
+      Buffer.byteLength(logoBase64, 'utf8') > MAX_LOGO_BASE64_SIZE
+    ) {
+      throw new BadRequestException(
+        'Base64-encoded logo must not exceed 2 MiB.',
+      );
+    }
+
+    return logoBase64;
   }
 }

@@ -7,13 +7,9 @@ import {
   Patch,
   Post,
   Query,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiBody,
-  ApiConsumes,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -27,18 +23,8 @@ import { OrganizationResponseDto } from './dto/organization-response.dto.js';
 import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { UserRole } from '../common/enums/user-role.enum.js';
-import { FileInterceptor } from '@nestjs/platform-express';
-import type { FileUpload } from '../common/types/file-upload.types.js';
-import { FileImageValidationPipe } from '../common/pipes/file-image-validation.pipe.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { OrganizationGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
-import {
-  addressExample,
-  emailExample,
-  logoUrlExample,
-  organizationNameExample,
-  phoneExample,
-} from '../common/constants/api-value-example.constants.js';
 
 @ApiTags('organizations')
 @Controller('organizations')
@@ -66,59 +52,21 @@ export class OrganizationController {
 
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Create a new organization' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', example: organizationNameExample },
-        address: { type: 'string', example: addressExample },
-        email: { type: 'email', example: emailExample },
-        phone: { type: 'string', example: phoneExample },
-        file: { type: 'string', format: 'binary' },
-      },
-      required: ['name', 'address', 'email', 'phone', 'file'],
-    },
-  })
   @ApiCreatedResponse({ type: OrganizationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
-  create(
-    @Body() dto: CreateOrganizationDto,
-    @UploadedFile(new FileImageValidationPipe()) file: FileUpload,
-  ) {
-    return this.organizationService.create(dto, file);
+  create(@Body() dto: CreateOrganizationDto) {
+    return this.organizationService.create(dto);
   }
 
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
-  @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Update an organization by id' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', example: organizationNameExample },
-        address: { type: 'string', example: addressExample },
-        email: { type: 'email', example: emailExample },
-        phone: { type: 'string', example: phoneExample },
-        file: { type: 'string', format: 'binary' },
-        logoUrl: { type: 'string', example: logoUrlExample },
-      },
-      // required: ['name', 'address', 'email', 'phone', 'file'],
-    },
-  })
   @ApiOkResponse({ type: OrganizationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiNotFoundResponse({ description: 'Organization not found' })
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateOrganizationDto,
-    @UploadedFile(new FileImageValidationPipe(false)) file?: FileUpload,
-  ) {
-    return this.organizationService.update(id, dto, file);
+  update(@Param('id') id: string, @Body() dto: UpdateOrganizationDto) {
+    return this.organizationService.update(id, dto);
   }
 
   @Delete(':id')

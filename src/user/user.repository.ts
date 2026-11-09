@@ -92,7 +92,7 @@ export class UserRepository {
         select: {
           id: true,
           name: true,
-          logoUrl: true,
+          logoBase64: true,
           organizationUsers: {
             where: { userId: id },
             select: {

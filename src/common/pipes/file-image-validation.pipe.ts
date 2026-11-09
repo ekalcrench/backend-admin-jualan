@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 import { FileUpload } from '../types/file-upload.types.js';
 import { extname } from 'path';
+import { MAX_LOGO_FILE_SIZE } from '../constants/organization.constants.js';
 
 @Injectable()
 export class FileImageValidationPipe implements PipeTransform {
@@ -15,10 +16,10 @@ export class FileImageValidationPipe implements PipeTransform {
       return value;
     }
 
-    const maxSize = 1 * 1024 * 1024; // 1 MB
-
-    if (value.size > maxSize) {
-      throw new BadRequestException('Maksimal ukuran file 1MB');
+    if (value.size > MAX_LOGO_FILE_SIZE) {
+      throw new BadRequestException(
+        'Base64-encoded logo must not exceed 1 MiB.',
+      );
     }
 
     if (!value.mimetype.startsWith('image/')) {

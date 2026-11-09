@@ -3,10 +3,10 @@ import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
 import {
   addressExample,
   emailExample,
-  logoUrlExample,
   organizationNameExample,
   phoneExample,
 } from '../../common/constants/api-value-example.constants.js';
+import { MAX_LOGO_BASE64_SIZE } from '../../common/constants/organization.constants.js';
 
 export class OrganizationResponseDto extends BaseResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -24,6 +24,6 @@ export class OrganizationResponseDto extends BaseResponseDto {
   @ApiProperty({ example: phoneExample })
   phone!: string;
 
-  @ApiProperty({ example: logoUrlExample })
-  logoUrl!: string;
+  @ApiProperty({ maxLength: MAX_LOGO_BASE64_SIZE, nullable: true })
+  logoBase64!: string | null;
 }

@@ -5,9 +5,16 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { json, urlencoded } from 'express';
+import { MAX_LOGO_BASE64_SIZE } from './common/constants/organization.constants.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
+
+  app.use(json({ limit: MAX_LOGO_BASE64_SIZE + 64 * 1024 }));
+  app.use(urlencoded({ extended: true, limit: 100 * 1024 }));
 
   app.setGlobalPrefix('api', {
     exclude: ['uploads/(.*)'],

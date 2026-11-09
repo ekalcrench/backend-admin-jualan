@@ -1,6 +1,3 @@
-export const logoUrlExample =
-  '/uploads/organizations/396e51c9-efa4-4278-b7f6-ebcaa8063cad/tes-image.png';
-
 export const addressExample = 'Jl. Pegangsangan Timur No. 12';
 
 export const emailExample = 'user@example.com';

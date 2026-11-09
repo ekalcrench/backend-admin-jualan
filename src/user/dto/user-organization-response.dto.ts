@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { MAX_LOGO_BASE64_SIZE } from '../../common/constants/organization.constants.js';
 
 export class UserOrganizationResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -15,6 +16,6 @@ export class UserOrganizationResponseDto {
   })
   status!: string;
 
-  @ApiProperty({ nullable: true })
-  logoUrl!: string | null;
+  @ApiProperty({ maxLength: MAX_LOGO_BASE64_SIZE, nullable: true })
+  logoBase64!: string | null;
 }
