@@ -5,14 +5,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../prisma/generated/prisma/client.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
-import { OrganizationContext } from '../common/types/organization-context.types.js';
+import {
+  OrganizationUserRole,
+  Prisma,
+} from '../../prisma/generated/prisma/client.js';
 import { CreatePreparationDto } from './dto/create-preparation.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdatePreparationDto } from './dto/update-preparation.dto.js';
 import { PreparationRepository } from './preparation.repository.js';
 import { InventoryItemService } from '../inventory-item/inventory-item.service.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class PreparationService {
@@ -21,8 +23,8 @@ export class PreparationService {
     private readonly inventoryItemService: InventoryItemService,
   ) {}
 
-  async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
-    const organizationId = this.requireOrganizationId(context);
+  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
+    const organizationId = this.requireOrganizationId(userHeader);
     const { items, total } = await this.preparationRepository.findByPages({
       ...dto,
       organizationId,
@@ -39,10 +41,10 @@ export class PreparationService {
     };
   }
 
-  async findById(id: string, context: OrganizationContext) {
+  async findById(id: string, userHeader: UserRequestHeader) {
     const preparation = await this.preparationRepository.findById(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
     if (!preparation) {
       throw new NotFoundException('Preparation not found');
@@ -51,8 +53,8 @@ export class PreparationService {
     return this.toResponse(preparation);
   }
 
-  async create(dto: CreatePreparationDto, context: OrganizationContext) {
-    const organizationId = this.requireOrganizationId(context);
+  async create(dto: CreatePreparationDto, userHeader: UserRequestHeader) {
+    const organizationId = this.requireOrganizationId(userHeader);
     await this.inventoryItemService.ensureInventoryItemsBelongToOrganization(
       [
         dto.outputInventoryItemId,
@@ -83,9 +85,9 @@ export class PreparationService {
   async update(
     id: string,
     dto: UpdatePreparationDto,
-    context: OrganizationContext,
+    userHeader: UserRequestHeader,
   ) {
-    const organizationId = this.requireOrganizationId(context);
+    const organizationId = this.requireOrganizationId(userHeader);
     const inventoryItemIds = [
       ...(dto.outputInventoryItemId ? [dto.outputInventoryItemId] : []),
       ...(dto.preparationItems
@@ -150,10 +152,10 @@ export class PreparationService {
     return this.toResponse(preparation);
   }
 
-  async complete(id: string, context: OrganizationContext) {
+  async complete(id: string, userHeader: UserRequestHeader) {
     const preparation = await this.preparationRepository.complete(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
 
     if (preparation === 'not-found') {
@@ -184,11 +186,12 @@ export class PreparationService {
     return this.toResponse(preparation);
   }
 
-  async delete(id: string, context: OrganizationContext) {
+  async delete(id: string, userHeader: UserRequestHeader) {
     const result = await this.preparationRepository.delete(
       id,
-      this.requireOrganizationId(context),
-      context.organizationRoles?.includes(OrganizationUserRole.OWNER) ?? false,
+      this.requireOrganizationId(userHeader),
+      userHeader.organization_roles?.includes(OrganizationUserRole.OWNER) ??
+        false,
     );
     if (result === 'not-found') {
       throw new NotFoundException('Preparation not found');
@@ -206,11 +209,11 @@ export class PreparationService {
     return true;
   }
 
-  private requireOrganizationId(context: OrganizationContext) {
-    if (!context.organizationId) {
-      throw new ForbiddenException('Organization context is required');
+  private requireOrganizationId(userHeader: UserRequestHeader) {
+    if (!userHeader.organizationId) {
+      throw new ForbiddenException('Organization userHeader is required');
     }
-    return context.organizationId;
+    return userHeader.organizationId;
   }
 
   private toResponse(

@@ -19,10 +19,14 @@ import {
   OrganizationUserStatus,
   UserStatus,
 } from '../../prisma/generated/prisma/enums.js';
+import { randomUUID } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class AuthService {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
@@ -56,25 +60,32 @@ export class AuthService {
       throw new UnauthorizedException('Password tidak valid');
     }
 
-    const token = await this.jwtService.signAsync({
-      sub: user.id,
-      name: user.email,
-      roles: [user.role],
-      organization_roles: [],
-    });
+    const token = await this.jwtService.signAsync(
+      {
+        sub: user.id,
+        name: user.email,
+        roles: [user.role],
+        organization_roles: [],
+        jwt_id: randomUUID(),
+      },
+      { expiresIn: '1h' },
+    );
 
     return { user, token };
   }
 
-  async loginOrganization(userId: string, organizationId: string) {
-    const user = await this.userRepository.findById(userId);
+  async loginOrganization(
+    userHeader: UserRequestHeader,
+    organizationId: string,
+  ) {
+    const user = await this.userRepository.findById(userHeader.sub);
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
     const membership = await this.userRepository.findOrganizationMembership(
-      userId,
+      userHeader.sub,
       organizationId,
     );
 
@@ -90,15 +101,28 @@ export class AuthService {
       );
     }
 
+    await this.logout(userHeader);
+
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       name: user.email,
       roles: [user.role],
       organizationId,
       organization_roles: [membership.role],
+      jwt_id: randomUUID(),
     });
 
     return { accessToken };
+  }
+
+  async logout(userHeader: UserRequestHeader) {
+    await this.prisma.revokedToken.create({
+      data: {
+        jwtId: userHeader.jwt_id,
+      },
+    });
+
+    return true;
   }
 
   async register(dto: CreateUserDto) {

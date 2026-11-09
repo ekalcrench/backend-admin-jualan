@@ -30,7 +30,7 @@ import { OrganizationUserGetByPagesResponseDto } from './dto/get-by-pages-respon
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import type { Request } from 'express';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
+import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
 
 @ApiTags('organization-users')
 @Controller('organization-users')

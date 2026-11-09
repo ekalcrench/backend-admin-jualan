@@ -21,7 +21,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
 import { CreatePreparationDto } from './dto/create-preparation.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
@@ -29,6 +28,7 @@ import { PreparationGetByPagesResponseDto } from './dto/get-by-pages-response.dt
 import { PreparationResponseDto } from './dto/preparation-response.dto.js';
 import { UpdatePreparationDto } from './dto/update-preparation.dto.js';
 import { PreparationService } from './preparation.service.js';
+import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
 
 @ApiTags('preparations')
 @Controller('preparations')
@@ -134,9 +134,6 @@ export class PreparationController {
   })
   @ApiNotFoundResponse({ description: 'Preparation not found' })
   delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.preparationService.delete(id, {
-      organizationId: request.user.organizationId,
-      organizationRoles: request.user.organization_roles,
-    });
+    return this.preparationService.delete(id, request.user);
   }
 }

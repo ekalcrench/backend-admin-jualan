@@ -20,7 +20,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { OrderGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
@@ -31,6 +30,7 @@ import { OrderOverviewItemsResponseDto } from './dto/order-overview-items-respon
 import { UpdateOrderDto } from './dto/update-order.dto.js';
 import { OrderService } from './order.service.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
+import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
 
 @ApiTags('orders')
 @Controller('orders')

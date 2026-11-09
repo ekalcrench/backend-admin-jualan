@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { GetInventoryLotsByPagesDto } from './dto/get-inventory-lots-by-pages.dto.js';
 import { InventoryLotRepository } from './inventory-lot.repository.js';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
-import { OrganizationContext } from '../common/types/organization-context.types.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class InventoryLotService {
@@ -12,9 +12,9 @@ export class InventoryLotService {
 
   async findByPages(
     dto: GetInventoryLotsByPagesDto,
-    context: OrganizationContext,
+    userHeader: UserRequestHeader,
   ) {
-    const organizationId = this.requireOrganizationId(context);
+    const organizationId = this.requireOrganizationId(userHeader);
     const { items, total } = await this.inventoryLotRepository.findByPages(
       dto,
       organizationId,
@@ -31,12 +31,12 @@ export class InventoryLotService {
     };
   }
 
-  private requireOrganizationId(context: OrganizationContext) {
-    if (!context.organizationId) {
-      throw new ForbiddenException('Organization context is required');
+  private requireOrganizationId(userHeader: UserRequestHeader) {
+    if (!userHeader.organizationId) {
+      throw new ForbiddenException('Organization userHeader is required');
     }
 
-    return context.organizationId;
+    return userHeader.organizationId;
   }
 
   private toResponse(

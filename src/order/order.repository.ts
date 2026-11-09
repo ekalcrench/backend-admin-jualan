@@ -23,11 +23,7 @@ export class InsufficientOrderInventoryError extends Error {
 export class OrderRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  getOverviewItems(
-    organizationId: string,
-    startDate?: Date,
-    endDate?: Date,
-  ) {
+  getOverviewItems(organizationId: string, startDate?: Date, endDate?: Date) {
     const createdAt: { gte?: Date; lt?: Date } = {};
     if (startDate) {
       createdAt.gte = startDate;

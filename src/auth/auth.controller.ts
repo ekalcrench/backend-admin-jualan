@@ -31,7 +31,7 @@ import { LoginResponseDto } from './dto/login-response.dto.js';
 import { ResendOtpResponseDto } from './dto/resend-otp-response.dto.js';
 import { LoginOrganizationDto } from './dto/login-organization.dto.js';
 import { LoginOrganizationResponseDto } from './dto/login-organization-response.dto.js';
-import type { Request } from 'express';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -68,12 +68,19 @@ export class AuthController {
   @ApiNotFoundResponse({ description: 'User not found' })
   async loginOrganization(
     @Body() dto: LoginOrganizationDto,
-    @Req() request: Request & { user: { sub: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.authService.loginOrganization(
-      request.user.sub,
-      dto.organizationId,
-    );
+    return this.authService.loginOrganization(request.user, dto.organizationId);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('logout')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Revoke the current access token' })
+  @ApiOkResponse({ description: 'Access token has been revoked' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  async logout(@Req() request: AuthenticatedRequest) {
+    return this.authService.logout(request.user);
   }
 
   @Public()

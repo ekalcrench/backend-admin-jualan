@@ -1,7 +1,7 @@
 import { ApiProperty, IntersectionType } from '@nestjs/swagger';
 import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
-import { OrganizationUserRole } from '../../common/enums/organization-user-role.enum.js';
 import { OrganizationUserStatus } from '../../common/enums/organization-user-status.enum.js';
+import { OrganizationUserRole } from '../../../prisma/generated/prisma/enums.js';
 
 export class OrganizationUserResponseDto extends IntersectionType(
   BaseResponseDto,

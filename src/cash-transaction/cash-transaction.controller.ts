@@ -20,7 +20,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
 import { CashTransactionGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
@@ -32,6 +31,7 @@ import { CashTransactionService } from './cash-transaction.service.js';
 import { GetCashFlowDto } from './dto/get-cash-flow.dto.js';
 import { GetBalanceResponseDto } from './dto/get-balance-response.dto.js';
 import { GetCashFlowResponseDto } from './dto/get-cash-flow-response.dto.js';
+import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
 
 @ApiTags('cash-transactions')
 @Controller('cash-transactions')

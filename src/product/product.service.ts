@@ -16,16 +16,16 @@ import { ProductOptionsResponseDto } from './dto/product-options-response.dto.js
 import { ProductOverviewResponseDto } from './dto/product-overview-response.dto.js';
 import { ProductRecord } from './types/product-record.types.js';
 import { ProductOptionsRecord } from './types/product-options-record.types.js';
-import { OrganizationContext } from '../common/types/organization-context.types.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class ProductService {
   constructor(private readonly productRepository: ProductRepository) {}
 
-  async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
+  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
     const { items, total } = await this.productRepository.findByPages({
       ...dto,
-      organizationId: this.requireOrganizationId(context),
+      organizationId: this.requireOrganizationId(userHeader),
     });
     const remainingStockByInventoryItemId =
       await this.getRemainingStockByInventoryItemIds(
@@ -49,9 +49,9 @@ export class ProductService {
     };
   }
 
-  async findOptions(context: OrganizationContext) {
+  async findOptions(userHeader: UserRequestHeader) {
     const products = await this.productRepository.findOptions(
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
     const remainingStockByInventoryItemId =
       await this.getRemainingStockByInventoryItemIds(
@@ -68,10 +68,10 @@ export class ProductService {
   }
 
   async findOverview(
-    context: OrganizationContext,
+    userHeader: UserRequestHeader,
   ): Promise<ProductOverviewResponseDto[]> {
     const products = await this.productRepository.findOverview(
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
     const remainingStockByInventoryItemId =
       await this.getRemainingStockByInventoryItemIds(
@@ -98,10 +98,10 @@ export class ProductService {
     return stocks.filter(({ stock }) => stock === lowestStock);
   }
 
-  async findById(id: string, context: OrganizationContext) {
+  async findById(id: string, userHeader: UserRequestHeader) {
     const product = await this.productRepository.findById(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
 
     if (!product) {
@@ -117,8 +117,8 @@ export class ProductService {
     return this.toResponse(product, remainingStockByInventoryItemId);
   }
 
-  async create(dto: CreateProductDto, context: OrganizationContext) {
-    const organizationId = this.requireOrganizationId(context);
+  async create(dto: CreateProductDto, userHeader: UserRequestHeader) {
+    const organizationId = this.requireOrganizationId(userHeader);
     await this.ensureInventoryItemsBelongToOrganization(
       dto.productIngredients,
       organizationId,
@@ -146,9 +146,9 @@ export class ProductService {
   async update(
     id: string,
     dto: UpdateProductDto,
-    context: OrganizationContext,
+    userHeader: UserRequestHeader,
   ) {
-    const organizationId = this.requireOrganizationId(context);
+    const organizationId = this.requireOrganizationId(userHeader);
     await this.ensureExists(id, organizationId);
 
     const ingredientChanges = (dto.productIngredients ?? []).map((ingredient) =>
@@ -222,10 +222,10 @@ export class ProductService {
     }
   }
 
-  async delete(id: string, context: OrganizationContext) {
+  async delete(id: string, userHeader: UserRequestHeader) {
     const result = await this.productRepository.delete(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
 
     if (result === 'not-found') {
@@ -240,12 +240,12 @@ export class ProductService {
     return true;
   }
 
-  private requireOrganizationId(context: OrganizationContext) {
-    if (!context.organizationId) {
-      throw new ForbiddenException('Organization context is required');
+  private requireOrganizationId(userHeader: UserRequestHeader) {
+    if (!userHeader.organizationId) {
+      throw new ForbiddenException('Organization userHeader is required');
     }
 
-    return context.organizationId;
+    return userHeader.organizationId;
   }
 
   private async ensureExists(id: string, organizationId: string) {

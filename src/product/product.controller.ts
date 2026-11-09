@@ -19,9 +19,7 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { ProductGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
@@ -30,6 +28,8 @@ import { UpdateProductDto } from './dto/update-product.dto.js';
 import { ProductService } from './product.service.js';
 import { ProductOptionsResponseDto } from './dto/product-options-response.dto.js';
 import { ProductOverviewResponseDto } from './dto/product-overview-response.dto.js';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
+import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
 
 @ApiTags('products')
 @Controller('products')
@@ -43,7 +43,7 @@ export class ProductController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
     @Query() query: GetByPagesDto,
-    @Req() request: Request & { user: { organizationId?: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.productService.findByPages(query, request.user);
   }
@@ -56,7 +56,7 @@ export class ProductController {
   )
   @ApiOperation({ summary: 'Retrieve all product options' })
   @ApiOkResponse({ type: ProductOptionsResponseDto, isArray: true })
-  findOptions(@Req() request: Request & { user: { organizationId?: string } }) {
+  findOptions(@Req() request: AuthenticatedRequest) {
     return this.productService.findOptions(request.user);
   }
 
@@ -66,9 +66,7 @@ export class ProductController {
     summary: 'Retrieve products with the lowest available stock',
   })
   @ApiOkResponse({ type: ProductOverviewResponseDto, isArray: true })
-  findOverview(
-    @Req() request: Request & { user: { organizationId?: string } },
-  ) {
+  findOverview(@Req() request: AuthenticatedRequest) {
     return this.productService.findOverview(request.user);
   }
 
@@ -78,10 +76,7 @@ export class ProductController {
   @ApiParam({ name: 'id', description: 'Product UUID' })
   @ApiOkResponse({ type: ProductResponseDto })
   @ApiNotFoundResponse({ description: 'Product not found' })
-  findById(
-    @Param('id') id: string,
-    @Req() request: Request & { user: { organizationId?: string } },
-  ) {
+  findById(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.productService.findById(id, request.user);
   }
 
@@ -93,10 +88,7 @@ export class ProductController {
   @ApiConflictResponse({
     description: 'A product with this name already exists',
   })
-  create(
-    @Body() dto: CreateProductDto,
-    @Req() request: Request & { user: { organizationId?: string } },
-  ) {
+  create(@Body() dto: CreateProductDto, @Req() request: AuthenticatedRequest) {
     return this.productService.create(dto, request.user);
   }
 
@@ -116,7 +108,7 @@ export class ProductController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
-    @Req() request: Request & { user: { organizationId?: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.productService.update(id, dto, request.user);
   }
@@ -133,10 +125,7 @@ export class ProductController {
   @ApiConflictResponse({
     description: 'A product associated with orders cannot be deleted',
   })
-  delete(
-    @Param('id') id: string,
-    @Req() request: Request & { user: { organizationId?: string } },
-  ) {
+  delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.productService.delete(id, request.user);
   }
 }

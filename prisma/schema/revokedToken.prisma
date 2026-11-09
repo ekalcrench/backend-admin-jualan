@@ -1,0 +1,7 @@
+model RevokedToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  jwtId     String   @unique @map("jwt_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("revoked_tokens")
+}

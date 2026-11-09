@@ -20,22 +20,15 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { PurchasesGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { CreatePurchaseDto } from './dto/create-purchase.dto.js';
 import { PurchaseResponseDto } from './dto/purchase-response.dto.js';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto.js';
 import { PurchaseService } from './purchase.service.js';
-
-type AuthenticatedRequest = Request & {
-  user: {
-    organizationId?: string;
-    organization_roles?: OrganizationUserRole[];
-  };
-};
+import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
 
 @ApiTags('purchases')
 @Controller('purchases')
@@ -143,9 +136,6 @@ export class PurchaseController {
   })
   @ApiNotFoundResponse({ description: 'Purchase not found' })
   delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.purchaseService.delete(id, {
-      organizationId: request.user.organizationId,
-      organizationRoles: request.user.organization_roles,
-    });
+    return this.purchaseService.delete(id, request.user);
   }
 }

@@ -8,7 +8,6 @@ import {
   CashTransactionType,
   Prisma,
 } from '../../prisma/generated/prisma/client.js';
-import { OrganizationContext } from '../common/types/organization-context.types.js';
 import { CreateCashTransactionDto } from './dto/create-cash-transaction.dto.js';
 import { GetBalanceDto } from './dto/get-balance.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
@@ -17,6 +16,7 @@ import { CashTransactionRepository } from './cash-transaction.repository.js';
 import { GetCashFlowDto } from './dto/get-cash-flow.dto.js';
 import { GetBalanceResponseDto } from './dto/get-balance-response.dto.js';
 import { GetCashFlowResponseDto } from './dto/get-cash-flow-response.dto.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class CashTransactionService {
@@ -24,10 +24,10 @@ export class CashTransactionService {
     private readonly cashTransactionRepository: CashTransactionRepository,
   ) {}
 
-  async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
+  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
     const { items, total } = await this.cashTransactionRepository.findByPages({
       ...dto,
-      organizationId: this.requireOrganizationId(context),
+      organizationId: this.requireOrganizationId(userHeader),
     });
 
     return {
@@ -41,10 +41,10 @@ export class CashTransactionService {
     };
   }
 
-  async findById(id: string, context: OrganizationContext) {
+  async findById(id: string, userHeader: UserRequestHeader) {
     const transaction = await this.cashTransactionRepository.findById(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
     if (!transaction) {
       throw new NotFoundException('Cash transaction not found');
@@ -55,10 +55,10 @@ export class CashTransactionService {
 
   async getBalance(
     dto: GetBalanceDto,
-    context: OrganizationContext,
+    userHeader: UserRequestHeader,
   ): Promise<GetBalanceResponseDto> {
     const balances = await this.cashTransactionRepository.balance(
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
       dto.endDate,
     );
 
@@ -81,7 +81,7 @@ export class CashTransactionService {
 
   async getCashFlow(
     dto: GetCashFlowDto,
-    context: OrganizationContext,
+    userHeader: UserRequestHeader,
   ): Promise<GetCashFlowResponseDto> {
     if (
       dto.startDate &&
@@ -94,14 +94,14 @@ export class CashTransactionService {
     }
 
     const cashFlow = await this.cashTransactionRepository.cashFlowByType(
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
       dto.startDate,
       dto.endDate,
     );
     const previousRange = this.getPreviousDateRange(dto.startDate, dto.endDate);
     const previousCashFlow = previousRange
       ? await this.cashTransactionRepository.cashFlowByType(
-          this.requireOrganizationId(context),
+          this.requireOrganizationId(userHeader),
           previousRange.startDate,
           previousRange.endDate,
         )
@@ -175,10 +175,10 @@ export class CashTransactionService {
     };
   }
 
-  async create(dto: CreateCashTransactionDto, context: OrganizationContext) {
+  async create(dto: CreateCashTransactionDto, userHeader: UserRequestHeader) {
     this.assertEditableType(dto.type);
     const transaction = await this.cashTransactionRepository.create({
-      organizationId: this.requireOrganizationId(context),
+      organizationId: this.requireOrganizationId(userHeader),
       type: dto.type,
       amount: dto.amount,
       description: dto.description,
@@ -193,7 +193,7 @@ export class CashTransactionService {
   async update(
     id: string,
     dto: UpdateCashTransactionDto,
-    context: OrganizationContext,
+    userHeader: UserRequestHeader,
   ) {
     if (dto.type !== undefined) {
       this.assertEditableType(dto.type);
@@ -214,7 +214,7 @@ export class CashTransactionService {
 
     const transaction = await this.cashTransactionRepository.update(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
       data,
     );
 
@@ -230,10 +230,10 @@ export class CashTransactionService {
     return this.toResponse(transaction);
   }
 
-  async delete(id: string, context: OrganizationContext) {
+  async delete(id: string, userHeader: UserRequestHeader) {
     const result = await this.cashTransactionRepository.delete(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
     if (result === 'not-found') {
       throw new NotFoundException('Cash transaction not found');
@@ -258,12 +258,12 @@ export class CashTransactionService {
     }
   }
 
-  private requireOrganizationId(context: OrganizationContext) {
-    if (!context.organizationId) {
-      throw new ForbiddenException('Organization context is required');
+  private requireOrganizationId(userHeader: UserRequestHeader) {
+    if (!userHeader.organizationId) {
+      throw new ForbiddenException('Organization userHeader is required');
     }
 
-    return context.organizationId;
+    return userHeader.organizationId;
   }
 
   private toResponse(

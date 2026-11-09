@@ -1,12 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
-import {
-  emailExample,
-  passwordExample,
-  personNameExample,
-} from '../../common/constants/api-value-example.constants.js';
-import { OrganizationUserRole } from '../../common/enums/organization-user-role.enum.js';
+import { IsNotEmpty, IsString } from 'class-validator';
 import { OrganizationUserStatus } from '../../common/enums/organization-user-status.enum.js';
+import { OrganizationUserRole } from '../../../prisma/generated/prisma/enums.js';
 
 export class CreateOrganizationUserDto {
   @ApiProperty({ format: 'uuid' })

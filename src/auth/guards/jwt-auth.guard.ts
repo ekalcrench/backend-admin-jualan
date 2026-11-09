@@ -8,12 +8,14 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import { Reflector } from '@nestjs/core';
+import { PrismaService } from '../../prisma/prisma.service.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
-    private reflector: Reflector,
+    private readonly reflector: Reflector,
+    private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,12 +33,31 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException();
     }
 
+    let payload: Awaited<ReturnType<JwtService['verifyAsync']>>;
     try {
-      const payload = await this.jwtService.verifyAsync(token);
-      request['user'] = payload;
+      payload = await this.jwtService.verifyAsync(token);
     } catch {
       throw new UnauthorizedException();
     }
+
+    if (
+      !('jwt_id' in payload) ||
+      typeof payload.jwt_id !== 'string' ||
+      payload.jwt_id.length === 0
+    ) {
+      throw new UnauthorizedException();
+    }
+
+    const revokedToken = await this.prisma.revokedToken.findUnique({
+      where: { jwtId: payload.jwt_id },
+      select: { id: true },
+    });
+
+    if (revokedToken) {
+      throw new UnauthorizedException('Access token is no longer valid');
+    }
+
+    request['user'] = payload;
     return true;
   }
 

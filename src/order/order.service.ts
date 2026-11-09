@@ -15,17 +15,17 @@ import {
   OrderRepository,
 } from './order.repository.js';
 import { OrderItemChange } from './types/order-item-change.type.js';
-import { OrganizationContext } from '../common/types/organization-context.types.js';
 import { ProductByIdRecord } from './types/product-by-id-record-types.js';
 import { OrderRecord } from './types/order-record.types.js';
 import { OrderResponseDto } from './dto/order-response.dto.js';
 import { GetOrderOverviewDto } from './dto/get-overview.dto.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class OrderService {
   constructor(private readonly orderRepository: OrderRepository) {}
 
-  async getOverview(dto: GetOrderOverviewDto, context: OrganizationContext) {
+  async getOverview(dto: GetOrderOverviewDto, userHeader: UserRequestHeader) {
     if (
       dto.startDate &&
       dto.endDate &&
@@ -44,7 +44,7 @@ export class OrderService {
     if (!dto.startDate || !dto.endDate) {
       const [totals, totalUnitCost] =
         await this.orderRepository.getOverviewWithoutDateRange(
-          this.requireOrganizationId(context),
+          this.requireOrganizationId(userHeader),
         );
       const totalAmount = totals._sum.totalAmount ?? new Prisma.Decimal(0);
       return {
@@ -59,7 +59,7 @@ export class OrderService {
 
     const [totals, previousOverviews, totalUnitCost, previousTotalUnitCost] =
       await this.orderRepository.getOverviewWithDateRange(
-        this.requireOrganizationId(context),
+        this.requireOrganizationId(userHeader),
         dto.startDate,
         dto.endDate,
       );
@@ -82,7 +82,7 @@ export class OrderService {
 
   async getOverviewItems(
     dto: GetOrderOverviewDto,
-    context: OrganizationContext,
+    userHeader: UserRequestHeader,
   ) {
     if (
       dto.startDate &&
@@ -95,7 +95,7 @@ export class OrderService {
     }
 
     const items = await this.orderRepository.getOverviewItems(
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
       dto.startDate,
       dto.endDate,
     );
@@ -146,7 +146,7 @@ export class OrderService {
     };
   }
 
-  async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
+  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
     if (
       dto.startDate &&
       dto.endDate &&
@@ -157,7 +157,7 @@ export class OrderService {
       );
     }
 
-    const organizationId = this.requireOrganizationId(context);
+    const organizationId = this.requireOrganizationId(userHeader);
     const { items, total } = await this.orderRepository.findByPages({
       ...dto,
       organizationId,
@@ -174,10 +174,10 @@ export class OrderService {
     };
   }
 
-  async findById(id: string, context: OrganizationContext) {
+  async findById(id: string, userHeader: UserRequestHeader) {
     const order = await this.orderRepository.findById(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
     if (!order) {
       throw new NotFoundException('Order not found');
@@ -186,11 +186,11 @@ export class OrderService {
     return this.toResponse(order);
   }
 
-  async markPaid(id: string, context: OrganizationContext) {
+  async markPaid(id: string, userHeader: UserRequestHeader) {
     try {
       const result = await this.orderRepository.markPaid(
         id,
-        this.requireOrganizationId(context),
+        this.requireOrganizationId(userHeader),
       );
 
       if (result === 'not-found') {
@@ -207,8 +207,8 @@ export class OrderService {
     }
   }
 
-  async create(dto: CreateOrderDto, context: OrganizationContext) {
-    const organizationId = this.requireOrganizationId(context);
+  async create(dto: CreateOrderDto, userHeader: UserRequestHeader) {
+    const organizationId = this.requireOrganizationId(userHeader);
     await this.ensureProductsBelongToOrganization(
       dto.orderItems.map((item) => item.productId),
       organizationId,
@@ -233,8 +233,8 @@ export class OrderService {
     }
   }
 
-  async update(id: string, dto: UpdateOrderDto, context: OrganizationContext) {
-    const organizationId = this.requireOrganizationId(context);
+  async update(id: string, dto: UpdateOrderDto, userHeader: UserRequestHeader) {
+    const organizationId = this.requireOrganizationId(userHeader);
     const updatedItemIds = new Set(
       dto.orderItems
         ?.map((item) => item.id)
@@ -304,10 +304,10 @@ export class OrderService {
     }
   }
 
-  async delete(id: string, context: OrganizationContext) {
+  async delete(id: string, userHeader: UserRequestHeader) {
     const result = await this.orderRepository.delete(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
     if (result === 'not-found') {
       throw new NotFoundException('Order not found');
@@ -318,12 +318,12 @@ export class OrderService {
     return true;
   }
 
-  private requireOrganizationId(context: OrganizationContext) {
-    if (!context.organizationId) {
-      throw new ForbiddenException('Organization context is required');
+  private requireOrganizationId(userHeader: UserRequestHeader) {
+    if (!userHeader.organizationId) {
+      throw new ForbiddenException('Organization userHeader is required');
     }
 
-    return context.organizationId;
+    return userHeader.organizationId;
   }
 
   private async ensureProductsBelongToOrganization(

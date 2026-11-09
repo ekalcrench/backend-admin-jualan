@@ -1,9 +1,9 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
-import { OrganizationContext } from '../common/types/organization-context.types.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { InventoryTransactionRepository } from './inventory-transaction.repository.js';
 import { responseInclude } from './constants/response-include.constants.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class InventoryTransactionService {
@@ -11,8 +11,8 @@ export class InventoryTransactionService {
     private readonly inventoryTransactionRepository: InventoryTransactionRepository,
   ) {}
 
-  async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
-    const organizationId = this.requireOrganizationId(context);
+  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
+    const organizationId = this.requireOrganizationId(userHeader);
     const { items, total } =
       await this.inventoryTransactionRepository.findByPages({
         ...dto,
@@ -30,12 +30,12 @@ export class InventoryTransactionService {
     };
   }
 
-  private requireOrganizationId(context: OrganizationContext) {
-    if (!context.organizationId) {
-      throw new ForbiddenException('Organization context is required');
+  private requireOrganizationId(userHeader: UserRequestHeader) {
+    if (!userHeader.organizationId) {
+      throw new ForbiddenException('Organization userHeader is required');
     }
 
-    return context.organizationId;
+    return userHeader.organizationId;
   }
 
   private toResponse(

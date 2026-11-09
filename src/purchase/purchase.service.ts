@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  OrganizationUserRole,
   Prisma,
   PurchaseStatus,
 } from '../../prisma/generated/prisma/client.js';
@@ -15,15 +16,14 @@ import { UpdatePurchaseItemDto } from './dto/update-purchase-item.dto.js';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto.js';
 import { PurchaseRepository } from './purchase.repository.js';
 import { PurchaseItemChange } from './types/purchase-item-change.type.js';
-import { OrganizationContext } from '../common/types/organization-context.types.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class PurchaseService {
   constructor(private readonly purchaseRepository: PurchaseRepository) {}
 
-  async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
-    const organizationId = this.requireOrganizationId(context);
+  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
+    const organizationId = this.requireOrganizationId(userHeader);
     const { items, total } = await this.purchaseRepository.findByPages({
       ...dto,
       organizationId,
@@ -40,10 +40,10 @@ export class PurchaseService {
     };
   }
 
-  async findById(id: string, context: OrganizationContext) {
+  async findById(id: string, userHeader: UserRequestHeader) {
     const purchase = await this.purchaseRepository.findById(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
 
     if (!purchase) {
@@ -53,8 +53,8 @@ export class PurchaseService {
     return this.toResponse(purchase);
   }
 
-  async create(dto: CreatePurchaseDto, context: OrganizationContext) {
-    const organizationId = this.requireOrganizationId(context);
+  async create(dto: CreatePurchaseDto, userHeader: UserRequestHeader) {
+    const organizationId = this.requireOrganizationId(userHeader);
     const inventoryItemIds = [
       ...new Set(dto.purchaseItems.map((item) => item.inventoryItemId)),
     ];
@@ -100,9 +100,9 @@ export class PurchaseService {
   async update(
     id: string,
     dto: UpdatePurchaseDto,
-    context: OrganizationContext,
+    userHeader: UserRequestHeader,
   ) {
-    const organizationId = this.requireOrganizationId(context);
+    const organizationId = this.requireOrganizationId(userHeader);
     await this.ensureExists(id, organizationId);
 
     const itemChanges = dto.purchaseItems?.map((item) =>
@@ -260,11 +260,12 @@ export class PurchaseService {
     };
   }
 
-  async delete(id: string, context: OrganizationContext) {
+  async delete(id: string, userHeader: UserRequestHeader) {
     const result = await this.purchaseRepository.delete(
       id,
-      this.requireOrganizationId(context),
-      context.organizationRoles?.includes(OrganizationUserRole.OWNER) ?? false,
+      this.requireOrganizationId(userHeader),
+      userHeader.organization_roles?.includes(OrganizationUserRole.OWNER) ??
+        false,
     );
 
     if (result === 'not-found') {
@@ -294,10 +295,10 @@ export class PurchaseService {
     return true;
   }
 
-  async finalize(id: string, context: OrganizationContext) {
+  async finalize(id: string, userHeader: UserRequestHeader) {
     const result = await this.purchaseRepository.finalize(
       id,
-      this.requireOrganizationId(context),
+      this.requireOrganizationId(userHeader),
     );
 
     if (result === 'not-found') {
@@ -311,12 +312,12 @@ export class PurchaseService {
     return this.toResponse(result);
   }
 
-  private requireOrganizationId(context: OrganizationContext) {
-    if (!context.organizationId) {
-      throw new ForbiddenException('Organization context is required');
+  private requireOrganizationId(userHeader: UserRequestHeader) {
+    if (!userHeader.organizationId) {
+      throw new ForbiddenException('Organization userHeader is required');
     }
 
-    return context.organizationId;
+    return userHeader.organizationId;
   }
 
   private async ensureExists(id: string, organizationId: string) {

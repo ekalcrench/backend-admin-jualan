@@ -21,7 +21,6 @@ import {
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { InventoryItemGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
@@ -29,6 +28,8 @@ import { InventoryItemResponseDto } from './dto/inventory-item-response.dto.js';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
 import { InventoryItemService } from './inventory-item.service.js';
 import { InventoryItemOptionsResponseDto } from './dto/inventory-item-options-response.dto.js';
+import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
 
 @ApiTags('inventory-items')
 @Controller('inventory-items')
@@ -46,7 +47,7 @@ export class InventoryItemController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
     @Query() query: GetByPagesDto,
-    @Req() request: Request & { user: { organizationId?: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.inventoryItemService.findByPages(query, request.user);
   }
@@ -59,7 +60,7 @@ export class InventoryItemController {
   )
   @ApiOperation({ summary: 'Retrieve all inventory items options' })
   @ApiOkResponse({ type: InventoryItemOptionsResponseDto, isArray: true })
-  findOptions(@Req() request: Request & { user: { organizationId?: string } }) {
+  findOptions(@Req() request: AuthenticatedRequest) {
     return this.inventoryItemService.findOptions(request.user);
   }
 
@@ -73,10 +74,7 @@ export class InventoryItemController {
   @ApiParam({ name: 'id', description: 'Inventory item UUID' })
   @ApiOkResponse({ type: InventoryItemResponseDto })
   @ApiNotFoundResponse({ description: 'Inventory item not found' })
-  findById(
-    @Param('id') id: string,
-    @Req() request: Request & { user: { organizationId?: string } },
-  ) {
+  findById(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.inventoryItemService.findById(id, request.user);
   }
 
@@ -92,7 +90,7 @@ export class InventoryItemController {
   @ApiConflictResponse({ description: 'An item with this name already exists' })
   create(
     @Body() dto: CreateInventoryItemDto,
-    @Req() request: Request & { user: { organizationId?: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.inventoryItemService.create(dto, request.user);
   }
@@ -112,7 +110,7 @@ export class InventoryItemController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateInventoryItemDto,
-    @Req() request: Request & { user: { organizationId?: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.inventoryItemService.update(id, dto, request.user);
   }
@@ -126,10 +124,7 @@ export class InventoryItemController {
     type: Boolean,
   })
   @ApiNotFoundResponse({ description: 'Inventory item not found' })
-  delete(
-    @Param('id') id: string,
-    @Req() request: Request & { user: { organizationId?: string } },
-  ) {
+  delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.inventoryItemService.delete(id, request.user);
   }
 }

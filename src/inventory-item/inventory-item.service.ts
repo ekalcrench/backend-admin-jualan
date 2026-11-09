@@ -9,7 +9,7 @@ import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
 import { InventoryItemRepository } from './inventory-item.repository.js';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
-import { OrganizationContext } from '../common/types/organization-context.types.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class InventoryItemService {
@@ -17,7 +17,7 @@ export class InventoryItemService {
     private readonly inventoryItemRepository: InventoryItemRepository,
   ) {}
 
-  async findByPages(dto: GetByPagesDto, context: OrganizationContext) {
+  async findByPages(dto: GetByPagesDto, context: UserRequestHeader) {
     const organizationId = this.requireOrganizationId(context);
     const { items, total } = await this.inventoryItemRepository.findByPages({
       ...dto,
@@ -35,7 +35,7 @@ export class InventoryItemService {
     };
   }
 
-  async findById(id: string, context: OrganizationContext) {
+  async findById(id: string, context: UserRequestHeader) {
     const item = await this.inventoryItemRepository.findById(
       this.requireOrganizationId(context),
       id,
@@ -48,13 +48,13 @@ export class InventoryItemService {
     return this.toResponse(item);
   }
 
-  findOptions(context: OrganizationContext) {
+  findOptions(context: UserRequestHeader) {
     return this.inventoryItemRepository.findOptions(
       this.requireOrganizationId(context),
     );
   }
 
-  async create(dto: CreateInventoryItemDto, context: OrganizationContext) {
+  async create(dto: CreateInventoryItemDto, context: UserRequestHeader) {
     const organizationId = this.requireOrganizationId(context);
 
     try {
@@ -74,7 +74,7 @@ export class InventoryItemService {
   async update(
     id: string,
     dto: UpdateInventoryItemDto,
-    context: OrganizationContext,
+    context: UserRequestHeader,
   ) {
     const organizationId = this.requireOrganizationId(context);
     await this.ensureExists(id, organizationId);
@@ -89,7 +89,7 @@ export class InventoryItemService {
     }
   }
 
-  async delete(id: string, context: OrganizationContext) {
+  async delete(id: string, context: UserRequestHeader) {
     await this.ensureExists(id, this.requireOrganizationId(context));
     await this.inventoryItemRepository.delete(id);
     return true;
@@ -111,7 +111,7 @@ export class InventoryItemService {
     }
   }
 
-  private requireOrganizationId(context: OrganizationContext) {
+  private requireOrganizationId(context: UserRequestHeader) {
     if (!context.organizationId) {
       throw new ForbiddenException('Organization context is required');
     }

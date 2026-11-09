@@ -5,12 +5,12 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
-import { OrganizationUserRole } from '../common/enums/organization-user-role.enum.js';
 import { GetInventoryLotsByPagesDto } from './dto/get-inventory-lots-by-pages.dto.js';
 import { InventoryLotGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { InventoryLotService } from './inventory-lot.service.js';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
+import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
 
 @ApiTags('inventory-lots')
 @Controller('inventory-lots')
@@ -28,7 +28,7 @@ export class InventoryLotController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
     @Query() query: GetInventoryLotsByPagesDto,
-    @Req() request: Request & { user: { organizationId?: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.inventoryLotService.findByPages(query, request.user);
   }
