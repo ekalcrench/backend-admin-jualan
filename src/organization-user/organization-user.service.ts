@@ -71,13 +71,12 @@ export class OrganizationUserService {
 
     const existingUser = await this.organizationUserRepository.findByUserId(
       dto.userId,
+      organizationId,
     );
 
     if (existingUser) {
       throw new ConflictException('User sudah terdaftar');
     }
-
-    console.log('>>> dto : ', dto);
 
     const user = await this.organizationUserRepository.create({
       role: dto.role,

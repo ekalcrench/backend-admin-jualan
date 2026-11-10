@@ -74,9 +74,9 @@ export class OrganizationUserRepository {
     });
   }
 
-  findByUserId(userId: string) {
+  findByUserId(userId: string, organizationId: string) {
     return this.prisma.organizationUser.findFirst({
-      where: { userId },
+      where: { userId, organizationId },
     });
   }
 
