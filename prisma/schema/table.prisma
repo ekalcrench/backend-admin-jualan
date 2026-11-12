@@ -1,0 +1,22 @@
+model Table {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  tableNumber String      @map("table_number") @db.VarChar(20)
+  name        String?     @db.VarChar(100)
+  capacity    Int         @default(2)
+  status      TableStatus @default(AVAILABLE)
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  dineInOrders DineInOrder[]
+
+  @@unique([organizationId, tableNumber])
+  @@index([organizationId])
+  @@map("tables")
+}

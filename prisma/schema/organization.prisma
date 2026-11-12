@@ -1,23 +1,25 @@
 model Organization {
-  id         String  @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
+
   name       String  @db.VarChar(255)
   address    String  @default("") @db.VarChar(255)
-  phone      String  @default("") @db.VarChar(16)
   email      String  @default("") @db.VarChar(255)
+  phone      String  @default("") @db.VarChar(16)
   logoBase64 String? @default("") @map("logo_base64")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
-  organizationUsers     OrganizationUser[]
-  inventoryTransactions InventoryTransaction[]
-  inventoryItems        InventoryItem[]
-  products              Product[]
-  orders                Order[]
-  purchases             Purchase[]
   cashTransactions      CashTransaction[]
+  inventoryItems        InventoryItem[]
+  inventoryTransactions InventoryTransaction[]
+  orders                Order[]
+  organizationUsers     OrganizationUser[]
   preparations          Preparation[]
+  products              Product[]
+  purchases             Purchase[]
+  tables                Table[]
 
   @@index([createdAt])
   @@map("organizations")

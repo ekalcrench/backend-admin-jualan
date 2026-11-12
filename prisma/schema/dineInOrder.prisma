@@ -1,0 +1,12 @@
+model DineInOrder {
+  id      String @id @default(uuid()) @db.Uuid
+  tableId String @map("table_id") @db.Uuid
+
+  name       String?
+  guestCount Int     @default(1) @map("guest_count")
+
+  // Relationships
+  table Table @relation(fields: [tableId], references: [id])
+
+  @@map("dine_in_orders")
+}

@@ -1,0 +1,7 @@
+enum OrderType {
+  DELIVERY
+  TAKEAWAY
+  DINE_IN
+
+  @@map("order_type")
+}

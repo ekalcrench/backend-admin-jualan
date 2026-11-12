@@ -2,16 +2,24 @@ model Order {
   id             String @id @default(uuid()) @db.Uuid
   organizationId String @map("organization_id") @db.Uuid
 
+  cashierId  String? @map("cashier_id") @db.Uuid
+  customerId String? @map("customer_id") @db.Uuid
+
   orderNumber   String      @map("order_number")
   totalAmount   Decimal     @map("total_amount") @db.Decimal(15, 2)
   totalQuantity Int         @default(0) @map("total_quantity")
   status        OrderStatus @default(UNPAID)
+
+  type        OrderType @default(DELIVERY)
+  referenceId String    @default("bd2cee73-32e2-4a0f-ac38-b21c9b2ee8b4") @map("reference_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
   organization Organization @relation(fields: [organizationId], references: [id])
+  cashier      User?        @relation(fields: [cashierId], references: [id])
+  customer     User?        @relation("CustomerOrders", fields: [customerId], references: [id])
   items        OrderItem[]
 
   @@unique([organizationId, orderNumber])

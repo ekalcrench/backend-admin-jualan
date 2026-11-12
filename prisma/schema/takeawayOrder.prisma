@@ -1,0 +1,9 @@
+model TakeawayOrder {
+  id String @id @default(uuid()) @db.Uuid
+
+  name       String   @db.VarChar(255)
+  phone      String?  @db.VarChar(16)
+  pickUpTime DateTime @default(now()) @map("pick_up_time")
+
+  @@map("takeaway_orders")
+}

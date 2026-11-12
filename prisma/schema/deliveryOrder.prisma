@@ -1,0 +1,13 @@
+model DeliveryOrder {
+  id String @id @default(uuid()) @db.Uuid
+
+  deliveryFee Decimal @map("delivery_fee") @db.Decimal(15, 2)
+  name        String  @db.VarChar(255)
+  address     String  @db.VarChar(255)
+  phone       String  @db.VarChar(16)
+
+  latitude  Decimal @db.Decimal(10, 8)
+  longitude Decimal @db.Decimal(11, 8)
+
+  @@map("delivery_orders")
+}
