@@ -10,12 +10,34 @@ import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto.js
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { OrganizationUserRepository } from './organization-user.repository.js';
 import { OrganizationUserStatus } from '../../prisma/generated/prisma/enums.js';
+import { OrganizationUserResponseDto } from './dto/organization-user-response.dto.js';
 
 @Injectable()
 export class OrganizationUserService {
   constructor(
     private readonly organizationUserRepository: OrganizationUserRepository,
   ) {}
+
+  private toResponse(
+    organizationUser: NonNullable<
+      Awaited<ReturnType<OrganizationUserRepository['findById']>>
+    >,
+  ): OrganizationUserResponseDto {
+    return {
+      id: organizationUser.id,
+      userId: organizationUser.userId,
+      role: organizationUser.role,
+      status: organizationUser.status,
+      approvedAt: organizationUser.approvedAt,
+      approvedById: organizationUser.approvedById,
+      updatedById: organizationUser.updatedById,
+      createdAt: organizationUser.createdAt,
+      updatedAt: organizationUser.updatedAt,
+      name: organizationUser.user.name,
+      email: organizationUser.user.email,
+      organizationId: organizationUser.organizationId,
+    };
+  }
 
   async findByPages(
     dto: GetByPagesDto,
@@ -33,13 +55,7 @@ export class OrganizationUserService {
     });
 
     return {
-      items: items.map(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ({ user, organizationId: _organizationId, ...organizationUser }) => ({
-          ...organizationUser,
-          ...user,
-        }),
-      ),
+      items: items.map((item) => this.toResponse(item)),
       pagination: {
         page: dto.page,
         size: dto.size,
@@ -56,7 +72,7 @@ export class OrganizationUserService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    return this.toResponse(user);
   }
 
   async create(
@@ -85,7 +101,7 @@ export class OrganizationUserService {
       organization: { connect: { id: organizationId } },
     });
 
-    return user;
+    return this.toResponse(user);
   }
 
   async update(id: string, dto: UpdateOrganizationUserDto) {
@@ -97,7 +113,7 @@ export class OrganizationUserService {
 
     const user = await this.organizationUserRepository.update(id, dto);
 
-    return user;
+    return this.toResponse(user);
   }
 
   async suspend(id: string) {
@@ -115,7 +131,7 @@ export class OrganizationUserService {
       status: OrganizationUserStatus.SUSPENDED,
     });
 
-    return updatedUser;
+    return this.toResponse(updatedUser);
   }
 
   async activate(id: string) {
@@ -133,7 +149,7 @@ export class OrganizationUserService {
       status: OrganizationUserStatus.APPROVED,
     });
 
-    return updatedUser;
+    return this.toResponse(updatedUser);
   }
 
   async approve(id: string) {
@@ -151,6 +167,6 @@ export class OrganizationUserService {
       status: OrganizationUserStatus.APPROVED,
     });
 
-    return updatedUser;
+    return this.toResponse(updatedUser);
   }
 }

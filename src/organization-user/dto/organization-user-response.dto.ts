@@ -1,32 +1,38 @@
-import { ApiProperty, IntersectionType } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
-import { OrganizationUserStatus } from '../../common/enums/organization-user-status.enum.js';
-import { OrganizationUserRole } from '../../../prisma/generated/prisma/enums.js';
+import {
+  OrganizationUserRole,
+  OrganizationUserStatus,
+} from '../../../prisma/generated/prisma/enums.js';
 
-export class OrganizationUserResponseDto extends IntersectionType(
-  BaseResponseDto,
-) {
+export class OrganizationUserResponseDto extends BaseResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
   @ApiProperty({ format: 'uuid' })
-  userId!: string;
+  organizationId!: string;
 
   @ApiProperty({ format: 'uuid' })
-  organizationId!: string;
+  userId!: string;
+
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty()
+  email!: string;
 
   @ApiProperty({ enum: OrganizationUserRole })
   role!: OrganizationUserRole;
 
-  @ApiProperty({ format: 'date-time' })
-  approvedAt!: Date;
-
-  @ApiProperty({ format: 'uuid' })
-  approvedById!: string;
-
   @ApiProperty({ enum: OrganizationUserStatus })
   status!: OrganizationUserStatus;
 
-  @ApiProperty({ format: 'uuid' })
-  updatedById!: string;
+  @ApiProperty({ format: 'date-time', nullable: true })
+  approvedAt!: Date | null;
+
+  @ApiProperty({ format: 'uuid', nullable: true })
+  approvedById!: string | null;
+
+  @ApiProperty({ format: 'uuid', nullable: true })
+  updatedById!: string | null;
 }

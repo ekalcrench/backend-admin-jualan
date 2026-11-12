@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Injectable } from '@nestjs/common';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
 import { sortMap } from './constants/sort.map.constants.js';
+import { organizationUserResponseInclude } from './constants/response-include.constants.js';
 
 @Injectable()
 export class OrganizationUserRepository {
@@ -44,14 +45,7 @@ export class OrganizationUserRepository {
         skip,
         take: size,
         where,
-        include: {
-          user: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-        },
+        include: organizationUserResponseInclude,
         orderBy: {
           user: sortMap[sortBy] ?? sortMap['-createdAt'],
         },
@@ -71,6 +65,7 @@ export class OrganizationUserRepository {
   findById(id: string) {
     return this.prisma.organizationUser.findUnique({
       where: { id },
+      include: organizationUserResponseInclude,
     });
   }
 
@@ -83,6 +78,7 @@ export class OrganizationUserRepository {
   create(data: Prisma.OrganizationUserCreateInput) {
     return this.prisma.organizationUser.create({
       data,
+      include: organizationUserResponseInclude,
     });
   }
 
@@ -90,6 +86,7 @@ export class OrganizationUserRepository {
     return this.prisma.organizationUser.update({
       where: { id },
       data,
+      include: organizationUserResponseInclude,
     });
   }
 }
