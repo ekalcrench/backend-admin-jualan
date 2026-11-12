@@ -41,7 +41,7 @@ export class OrderController {
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve orders by pages' })
   @ApiOkResponse({ type: OrderGetByPagesResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid request payload' })
+  @ApiBadRequestResponse({ description: 'Invalid date range' })
   findByPages(
     @Query() query: GetByPagesDto,
     @Req() request: AuthenticatedRequest,
@@ -86,17 +86,24 @@ export class OrderController {
   @Post()
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
-    summary: 'Create an unpaid order using current product selling prices',
+    summary:
+      'Create an unpaid order with type-specific details and current product selling prices',
   })
   @ApiCreatedResponse({ type: OrderResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid request payload' })
+  @ApiBadRequestResponse({
+    description:
+      'Invalid request payload or dine-in guest count exceeds table capacity',
+  })
   @ApiConflictResponse({
     description: 'Stok untuk inventory item tidak mencukupi',
   })
   @ApiConflictResponse({
     description: 'An order with this number already exists',
   })
-  @ApiNotFoundResponse({ description: 'One or more products were not found' })
+  @ApiNotFoundResponse({
+    description:
+      'A product was not found in this organization, or a customer or dine-in table was not found',
+  })
   create(@Body() dto: CreateOrderDto, @Req() request: AuthenticatedRequest) {
     return this.orderService.create(dto, request.user);
   }
@@ -118,15 +125,20 @@ export class OrderController {
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Update an unpaid order; use deletedOrderItemIds to remove selected items',
+      'Update an unpaid order and its type-specific details; use deletedOrderItemIds to remove selected items',
   })
   @ApiParam({ name: 'id', description: 'Order UUID' })
   @ApiOkResponse({ type: OrderResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid request payload' })
+  @ApiBadRequestResponse({
+    description:
+      'Invalid request payload or dine-in guest count exceeds table capacity',
+  })
   @ApiConflictResponse({
     description: 'Paid orders cannot be updated',
   })
-  @ApiNotFoundResponse({ description: 'Order or order item not found' })
+  @ApiNotFoundResponse({
+    description: 'Order, order item, customer, or dine-in table not found',
+  })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateOrderDto,
@@ -142,7 +154,8 @@ export class OrderController {
   })
   @ApiParam({ name: 'id', description: 'Order UUID' })
   @ApiOkResponse({
-    description: 'Order and its order items deleted successfully',
+    description:
+      'Order, its items, and its type-specific details deleted successfully',
     type: Boolean,
   })
   @ApiConflictResponse({

@@ -25,3 +25,5 @@ export const sortByExample = '-createdAt';
 export const supplierNameExample = 'Yogya Toserba';
 
 export const invoiceExample = 'INV-001';
+
+export const uuidExample = '74d4a20d-30f0-45dc-b361-a81f304511ab';

@@ -9,10 +9,36 @@ import {
 } from 'class-validator';
 import { CreateOrderDto } from './create-order.dto.js';
 import { UpdateOrderItemDto } from './update-order-item.dto.js';
+import { UpdateDeliveryOrderDto } from './update-delivery-order.dto.js';
+import { UpdateDineInOrderDto } from './update-dine-in-order.dto.js';
+import { UpdateTakeawayOrderDto } from './update-takeaway-order.dto.js';
 
 export class UpdateOrderDto extends PartialType(
-  OmitType(CreateOrderDto, ['orderItems'] as const),
+  OmitType(CreateOrderDto, [
+    'orderItems',
+    'deliveryOrder',
+    'takeawayOrder',
+    'dineInOrder',
+  ] as const),
 ) {
+  @ApiPropertyOptional({ type: UpdateDeliveryOrderDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UpdateDeliveryOrderDto)
+  deliveryOrder?: UpdateDeliveryOrderDto;
+
+  @ApiPropertyOptional({ type: UpdateTakeawayOrderDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UpdateTakeawayOrderDto)
+  takeawayOrder?: UpdateTakeawayOrderDto;
+
+  @ApiPropertyOptional({ type: UpdateDineInOrderDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UpdateDineInOrderDto)
+  dineInOrder?: UpdateDineInOrderDto;
+
   @ApiPropertyOptional({ type: [UpdateOrderItemDto] })
   @IsOptional()
   @IsArray()

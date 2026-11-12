@@ -5,7 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../prisma/generated/prisma/client.js';
+import { OrderStatus, Prisma } from '../../prisma/generated/prisma/client.js';
+import { OrderType } from '../../prisma/generated/prisma/enums.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto.js';
@@ -20,6 +21,12 @@ import { OrderRecord } from './types/order-record.types.js';
 import { OrderResponseDto } from './dto/order-response.dto.js';
 import { GetOrderOverviewDto } from './dto/get-overview.dto.js';
 import { UserRequestHeader } from '../common/types/user-request-header.types.js';
+import { CreateDeliveryOrderDto } from './dto/create-delivery-order.dto.js';
+import { UpdateDeliveryOrderDto } from './dto/update-delivery-order.dto.js';
+import { CreateTakeawayOrderDto } from './dto/create-takeaway-order.dto.js';
+import { CreateDineInOrderDto } from './dto/create-dine-in-order.dto.js';
+import { UpdateDineInOrderDto } from './dto/update-dine-in-order.dto.js';
+import { UpdateTakeawayOrderDto } from './dto/update-takeaway-order.dto.js';
 
 @Injectable()
 export class OrderService {
@@ -209,15 +216,25 @@ export class OrderService {
 
   async create(dto: CreateOrderDto, userHeader: UserRequestHeader) {
     const organizationId = this.requireOrganizationId(userHeader);
+    this.validateOrderTypeDetails(dto, true);
     await this.ensureProductsBelongToOrganization(
       dto.orderItems.map((item) => item.productId),
       organizationId,
     );
+    await this.ensureCustomerExists(dto.customerId);
 
     try {
       const order = await this.orderRepository.create(
         organizationId,
         dto.orderNumber,
+        userHeader.sub,
+        dto.customerId,
+        dto.type,
+        {
+          deliveryOrder: dto.deliveryOrder ?? undefined,
+          takeawayOrder: dto.takeawayOrder ?? undefined,
+          dineInOrder: dto.dineInOrder ?? undefined,
+        },
         dto.orderItems,
       );
       if (order === 'product-not-found') {
@@ -225,6 +242,7 @@ export class OrderService {
           'One or more products were not found in this organization',
         );
       }
+      this.throwIfOrderTypeError(order);
       return this.toResponse(order);
     } catch (error) {
       this.throwIfInsufficientInventory(error);
@@ -235,6 +253,23 @@ export class OrderService {
 
   async update(id: string, dto: UpdateOrderDto, userHeader: UserRequestHeader) {
     const organizationId = this.requireOrganizationId(userHeader);
+    const existingOrder = await this.orderRepository.findOrderType(
+      id,
+      organizationId,
+    );
+    if (!existingOrder) {
+      throw new NotFoundException('Order not found');
+    }
+    if (existingOrder.status === OrderStatus.PAID) {
+      throw new ConflictException('Paid orders cannot be updated');
+    }
+    const type = dto.type ?? existingOrder.type;
+    this.validateOrderTypeDetails(
+      { ...dto, type },
+      type !== existingOrder.type,
+    );
+    await this.ensureCustomerExists(dto.customerId);
+
     const updatedItemIds = new Set(
       dto.orderItems
         ?.map((item) => item.id)
@@ -268,8 +303,10 @@ export class OrderService {
       this.toOrderItemChange(item, productsById),
     );
 
-    const orderData: Prisma.OrderUpdateManyMutationInput = {
+    const orderData: Prisma.OrderUncheckedUpdateManyInput = {
       ...(dto.orderNumber !== undefined && { orderNumber: dto.orderNumber }),
+      ...(dto.customerId !== undefined && { customerId: dto.customerId }),
+      ...(dto.type !== undefined && { type: dto.type }),
     };
 
     try {
@@ -279,6 +316,11 @@ export class OrderService {
         orderData,
         itemChanges,
         dto.deletedOrderItemIds,
+        {
+          deliveryOrder: dto.deliveryOrder ?? undefined,
+          takeawayOrder: dto.takeawayOrder ?? undefined,
+          dineInOrder: dto.dineInOrder ?? undefined,
+        },
       );
       if (order === 'not-found') {
         throw new NotFoundException('Order not found');
@@ -296,6 +338,7 @@ export class OrderService {
           'One or more products were not found in this organization',
         );
       }
+      this.throwIfOrderTypeError(order);
       return this.toResponse(order);
     } catch (error) {
       this.throwIfInsufficientInventory(error);
@@ -346,6 +389,12 @@ export class OrderService {
     return products;
   }
 
+  private async ensureCustomerExists(customerId?: string | null) {
+    if (customerId && !(await this.orderRepository.findUserById(customerId))) {
+      throw new NotFoundException('Customer was not found');
+    }
+  }
+
   private toOrderItemChange(
     item: UpdateOrderItemDto,
     productsById: Map<string, ProductByIdRecord>,
@@ -383,6 +432,45 @@ export class OrderService {
     return {
       id: order.id,
       organizationId: order.organizationId,
+      cashierId: order.cashierId,
+      cashierName: order.cashier?.name ?? null,
+      customerId: order.customerId,
+      type: order.type,
+      referenceId: order.referenceId,
+      deliveryOrder: order.deliveryOrder
+        ? {
+            id: order.deliveryOrder.id,
+            deliveryFee: order.deliveryOrder.deliveryFee.toNumber(),
+            name: order.deliveryOrder.name,
+            address: order.deliveryOrder.address,
+            phone: order.deliveryOrder.phone,
+            latitude: order.deliveryOrder.latitude.toNumber(),
+            longitude: order.deliveryOrder.longitude.toNumber(),
+          }
+        : null,
+      takeawayOrder: order.takeawayOrder
+        ? {
+            id: order.takeawayOrder.id,
+            name: order.takeawayOrder.name,
+            phone: order.takeawayOrder.phone,
+            pickUpTime: order.takeawayOrder.pickUpTime,
+          }
+        : null,
+      dineInOrder: order.dineInOrder
+        ? {
+            id: order.dineInOrder.id,
+            tableId: order.dineInOrder.tableId,
+            name: order.dineInOrder.name,
+            guestCount: order.dineInOrder.guestCount,
+            table: {
+              id: order.dineInOrder.table.id,
+              tableNumber: order.dineInOrder.table.tableNumber,
+              name: order.dineInOrder.table.name,
+              capacity: order.dineInOrder.table.capacity,
+              status: order.dineInOrder.table.status,
+            },
+          }
+        : null,
       orderNumber: order.orderNumber,
       totalAmount: order.totalAmount.toNumber(),
       totalQuantity: order.totalQuantity,
@@ -397,6 +485,90 @@ export class OrderService {
         product: item.product,
       })),
     };
+  }
+
+  private validateOrderTypeDetails(
+    dto: {
+      type: OrderType;
+      deliveryOrder?: CreateDeliveryOrderDto | UpdateDeliveryOrderDto;
+      takeawayOrder?: CreateTakeawayOrderDto | UpdateTakeawayOrderDto;
+      dineInOrder?: CreateDineInOrderDto | UpdateDineInOrderDto;
+    },
+    requireDetails: boolean,
+  ) {
+    const detailsByType = {
+      [OrderType.DELIVERY]: dto.deliveryOrder,
+      [OrderType.TAKEAWAY]: dto.takeawayOrder,
+      [OrderType.DINE_IN]: dto.dineInOrder,
+    };
+    const providedTypes = Object.entries(detailsByType)
+      .filter(([, details]) => details !== undefined && details !== null)
+      .map(([orderType]) => orderType);
+
+    if (
+      providedTypes.some((providedType) => providedType !== dto.type) ||
+      providedTypes.length > 1
+    ) {
+      throw new BadRequestException(
+        'Only the detail object matching the order type may be provided',
+      );
+    }
+
+    const details = detailsByType[dto.type];
+    if (requireDetails && !details) {
+      throw new BadRequestException(
+        `${dto.type} orders require their matching detail object`,
+      );
+    }
+
+    if (requireDetails && details) {
+      const requiredFields: Record<OrderType, string[]> = {
+        [OrderType.DELIVERY]: [
+          'deliveryFee',
+          'name',
+          'address',
+          'phone',
+          'latitude',
+          'longitude',
+        ],
+        [OrderType.TAKEAWAY]: ['name'],
+        [OrderType.DINE_IN]: ['tableId'],
+      };
+      const missingFields = requiredFields[dto.type].filter(
+        (field) => Reflect.get(details, field) === undefined,
+      );
+      if (missingFields.length) {
+        throw new BadRequestException(
+          `${dto.type} order details require: ${missingFields.join(', ')}`,
+        );
+      }
+    }
+  }
+
+  private throwIfOrderTypeError(
+    result: string | OrderRecord,
+  ): asserts result is OrderRecord {
+    if (typeof result !== 'string') {
+      return;
+    }
+    if (result === 'type-details-required') {
+      throw new BadRequestException(
+        'The order type requires its matching detail object',
+      );
+    }
+    if (result === 'table-not-found') {
+      throw new NotFoundException(
+        'The selected table was not found in this organization',
+      );
+    }
+    if (result === 'guest-count-exceeds-capacity') {
+      throw new BadRequestException(
+        'guestCount cannot exceed the table capacity',
+      );
+    }
+    if (result === 'type-detail-not-found') {
+      throw new NotFoundException('Order type details were not found');
+    }
   }
 
   private throwIfDuplicateOrderNumber(error: unknown): void {
