@@ -1,12 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import {
-  IsNumber,
-  IsOptional,
-  IsUUID,
-  Min,
-  ValidateIf,
-} from 'class-validator';
+import { IsNumber, IsOptional, IsUUID, Min, ValidateIf } from 'class-validator';
 
 export class UpdateProductIngredientDto {
   @ApiPropertyOptional({ format: 'uuid' })
