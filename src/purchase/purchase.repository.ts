@@ -210,10 +210,10 @@ export class PurchaseRepository {
                 id: true,
                 quantity: true,
                 remainingQuantity: true,
-                _count: {
-                  select: {
-                    preparationAllocations: true,
-                  },
+                inventoryTransactions: {
+                  where: { type: InventoryTransactionType.PREPARATION_OUT },
+                  take: 1,
+                  select: { id: true },
                 },
               },
             },
@@ -230,7 +230,7 @@ export class PurchaseRepository {
               (item.inventoryLot.remainingQuantity.lessThan(
                 item.inventoryLot.quantity,
               ) ||
-                item.inventoryLot._count.preparationAllocations > 0),
+                item.inventoryLot.inventoryTransactions.length > 0),
           )
         ) {
           return 'consumed' as const;
@@ -255,10 +255,10 @@ export class PurchaseRepository {
           select: {
             quantity: true,
             remainingQuantity: true,
-            _count: {
-              select: {
-                preparationAllocations: true,
-              },
+            inventoryTransactions: {
+              where: { type: InventoryTransactionType.PREPARATION_OUT },
+              take: 1,
+              select: { id: true },
             },
           },
         });
@@ -267,7 +267,7 @@ export class PurchaseRepository {
           lotsToDelete.some(
             (lot) =>
               lot.remainingQuantity.lessThan(lot.quantity) ||
-              lot._count.preparationAllocations > 0,
+              lot.inventoryTransactions.length > 0,
           )
         ) {
           return 'consumed' as const;
@@ -370,10 +370,10 @@ export class PurchaseRepository {
               id: true,
               quantity: true,
               remainingQuantity: true,
-              _count: {
-                select: {
-                  preparationAllocations: true,
-                },
+              inventoryTransactions: {
+                where: { type: InventoryTransactionType.PREPARATION_OUT },
+                take: 1,
+                select: { id: true },
               },
             },
           })
@@ -382,7 +382,7 @@ export class PurchaseRepository {
       if (lots.some((lot) => lot.remainingQuantity.lessThan(lot.quantity))) {
         return 'consumed' as const;
       }
-      if (lots.some((lot) => lot._count.preparationAllocations > 0)) {
+      if (lots.some((lot) => lot.inventoryTransactions.length > 0)) {
         return 'preparation-records-exist' as const;
       }
 

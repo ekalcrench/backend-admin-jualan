@@ -6,7 +6,6 @@ export const preparationInclude = {
     orderBy: { id: 'asc' },
     include: {
       inventoryItem: { select: { id: true, name: true, unit: true } },
-      allocations: { orderBy: { id: 'asc' } },
     },
   },
 } satisfies Prisma.PreparationInclude;

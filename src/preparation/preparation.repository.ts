@@ -12,9 +12,9 @@ import { UpdatePreparationItemDto } from './dto/update-preparation-item.dto.js';
 import { preparationInclude } from './constants/response-include.constants.js';
 import { PreparationItemInput } from './types/preparation-item-input.types.js';
 import { PreparationValues } from './types/preparation-values.types.js';
-import { PlannedAllocation } from './types/planned-allocation.types.js';
 import { PlannedItem } from './types/planned-item.types.js';
 import { roundCost } from '../common/constants/round-cost.constants.js';
+import type { PlannedPreparation } from './types/planned-preparation.types.js';
 
 @Injectable()
 export class PreparationRepository {
@@ -79,14 +79,17 @@ export class PreparationRepository {
   ) {
     return this.prisma.$transaction(
       async (transaction) => {
-        const plannedItems = await this.planItems(transaction, items);
-        if (!plannedItems) {
+        const plannedPreparation = await this.planItems(transaction, items);
+        if (!plannedPreparation) {
           return 'insufficient-stock' as const;
         }
 
-        await this.decreaseLotQuantities(transaction, plannedItems);
+        await this.decreaseLotQuantities(
+          transaction,
+          plannedPreparation.inventoryTransactions,
+        );
         const costs = this.calculateOutputCosts(
-          plannedItems,
+          plannedPreparation.items,
           values.outputQuantity,
         );
         const preparation = await transaction.preparation.create({
@@ -106,7 +109,13 @@ export class PreparationRepository {
         await this.createPreparationItems(
           transaction,
           preparation.id,
-          plannedItems,
+          plannedPreparation.items,
+        );
+        await this.createPreparationOutTransactions(
+          transaction,
+          organizationId,
+          preparation.id,
+          plannedPreparation.inventoryTransactions,
         );
         return transaction.preparation.findFirstOrThrow({
           where: { id: preparation.id, organizationId },
@@ -130,15 +139,18 @@ export class PreparationRepository {
           where: { id, organizationId },
           include: {
             outputLot: {
-              include: {
-                _count: {
-                  select: {
-                    preparationAllocations: true,
-                  },
+              select: {
+                id: true,
+                quantity: true,
+                remainingQuantity: true,
+                inventoryTransactions: {
+                  where: { type: InventoryTransactionType.PREPARATION_OUT },
+                  take: 1,
+                  select: { id: true },
                 },
               },
             },
-            items: { include: { allocations: true } },
+            items: true,
           },
         });
         if (!preparation) {
@@ -201,12 +213,27 @@ export class PreparationRepository {
           (preparation.outputLot.remainingQuantity.lessThan(
             preparation.outputLot.quantity,
           ) ||
-            preparation.outputLot._count.preparationAllocations > 0)
+            preparation.outputLot.inventoryTransactions.length > 0)
         ) {
           return 'output-consumed' as const;
         }
 
-        let plannedItems: PlannedItem[] | undefined;
+        const preparationOutTransactions =
+          await transaction.inventoryTransaction.findMany({
+            where: {
+              organizationId,
+              referenceId: id,
+              type: InventoryTransactionType.PREPARATION_OUT,
+            },
+            select: {
+              inventoryItemId: true,
+              inventoryLotId: true,
+              quantity: true,
+              unitCost: true,
+              totalCost: true,
+            },
+          });
+        let plannedPreparation: PlannedPreparation | undefined;
         if (hasItemChanges) {
           const changedById = new Map(
             changes
@@ -246,39 +273,57 @@ export class PreparationRepository {
             return 'empty-preparation' as const;
           }
 
-          plannedItems = await this.planItems(
+          plannedPreparation = await this.planItems(
             transaction,
             mergedItems,
-            preparation.items.flatMap((item) =>
-              item.allocations.map((allocation) => ({
-                inventoryLotId: allocation.inventoryLotId,
-                quantity: allocation.quantity,
-              })),
-            ),
+            preparationOutTransactions.map((transaction) => ({
+              inventoryLotId: transaction.inventoryLotId,
+              quantity: transaction.quantity,
+            })),
           );
-          if (!plannedItems) {
+          if (!plannedPreparation) {
             return 'insufficient-stock' as const;
           }
 
-          for (const item of preparation.items) {
-            for (const allocation of item.allocations) {
-              await transaction.inventoryLot.update({
-                where: { id: allocation.inventoryLotId },
-                data: {
-                  remainingQuantity: { increment: allocation.quantity },
+          for (const inventoryTransaction of preparationOutTransactions) {
+            await transaction.inventoryLot.update({
+              where: { id: inventoryTransaction.inventoryLotId },
+              data: {
+                remainingQuantity: {
+                  increment: inventoryTransaction.quantity,
                 },
-              });
-            }
+              },
+            });
           }
           await transaction.preparationItem.deleteMany({
             where: { preparationId: id },
           });
-          await this.decreaseLotQuantities(transaction, plannedItems);
-          await this.createPreparationItems(transaction, id, plannedItems);
+          await transaction.inventoryTransaction.deleteMany({
+            where: {
+              organizationId,
+              referenceId: id,
+              type: InventoryTransactionType.PREPARATION_OUT,
+            },
+          });
+          await this.decreaseLotQuantities(
+            transaction,
+            plannedPreparation.inventoryTransactions,
+          );
+          await this.createPreparationItems(
+            transaction,
+            id,
+            plannedPreparation.items,
+          );
+          await this.createPreparationOutTransactions(
+            transaction,
+            organizationId,
+            id,
+            plannedPreparation.inventoryTransactions,
+          );
         }
 
         const effectiveItems =
-          plannedItems ??
+          plannedPreparation?.items ??
           preparation.items.map((item) => ({
             unitCost: item.unitCost,
             quantity: item.quantity,
@@ -335,7 +380,6 @@ export class PreparationRepository {
             outputLotId = outputLot.id;
           }
           if (isCompleting) {
-            const preparationItems = plannedItems ?? preparation.items;
             await transaction.inventoryTransaction.createMany({
               data: [
                 {
@@ -348,18 +392,6 @@ export class PreparationRepository {
                   totalCost: costs.totalCost,
                   referenceId: id,
                 },
-                ...preparationItems.flatMap((item) =>
-                  item.allocations.map((allocation) => ({
-                    organizationId,
-                    inventoryItemId: item.inventoryItemId,
-                    inventoryLotId: allocation.inventoryLotId,
-                    type: InventoryTransactionType.PREPARATION_OUT,
-                    quantity: allocation.quantity,
-                    unitCost: allocation.unitCost,
-                    totalCost: allocation.totalCost,
-                    referenceId: id,
-                  })),
-                ),
               ],
             });
           }
@@ -387,15 +419,18 @@ export class PreparationRepository {
           where: { id, organizationId },
           include: {
             outputLot: {
-              include: {
-                _count: {
-                  select: {
-                    preparationAllocations: true,
-                  },
+              select: {
+                id: true,
+                quantity: true,
+                remainingQuantity: true,
+                inventoryTransactions: {
+                  where: { type: InventoryTransactionType.PREPARATION_OUT },
+                  take: 1,
+                  select: { id: true },
                 },
               },
             },
-            items: { include: { allocations: true } },
+            items: true,
           },
         });
         if (!preparation) {
@@ -409,18 +444,29 @@ export class PreparationRepository {
           (preparation.outputLot.remainingQuantity.lessThan(
             preparation.outputLot.quantity,
           ) ||
-            preparation.outputLot._count.preparationAllocations > 0)
+            preparation.outputLot.inventoryTransactions.length > 0)
         ) {
           return 'output-consumed' as const;
         }
 
-        for (const item of preparation.items) {
-          for (const allocation of item.allocations) {
-            await transaction.inventoryLot.update({
-              where: { id: allocation.inventoryLotId },
-              data: { remainingQuantity: { increment: allocation.quantity } },
-            });
-          }
+        const preparationOutTransactions =
+          await transaction.inventoryTransaction.findMany({
+            where: {
+              organizationId,
+              referenceId: id,
+              type: InventoryTransactionType.PREPARATION_OUT,
+            },
+            select: { inventoryLotId: true, quantity: true },
+          });
+        for (const inventoryTransaction of preparationOutTransactions) {
+          await transaction.inventoryLot.update({
+            where: { id: inventoryTransaction.inventoryLotId },
+            data: {
+              remainingQuantity: {
+                increment: inventoryTransaction.quantity,
+              },
+            },
+          });
         }
         await transaction.inventoryTransaction.deleteMany({
           where: {
@@ -454,7 +500,7 @@ export class PreparationRepository {
       inventoryLotId: string;
       quantity: Prisma.Decimal;
     }> = [],
-  ): Promise<PlannedItem[] | undefined> {
+  ): Promise<PlannedPreparation | undefined> {
     const inventoryItemIds = [
       ...new Set(items.map((item) => item.inventoryItemId)),
     ];
@@ -482,11 +528,12 @@ export class PreparationRepository {
     }
 
     const planned: PlannedItem[] = [];
+    const inventoryTransactions: PlannedPreparation['inventoryTransactions'] =
+      [];
     for (const item of items) {
       const quantity = new Prisma.Decimal(item.quantity);
       let quantityNeeded = quantity;
       let weightedCost = new Prisma.Decimal(0);
-      const allocations: PlannedAllocation[] = [];
       const itemLots = lots.filter(
         (lot) => lot.inventoryItemId === item.inventoryItemId,
       );
@@ -500,7 +547,8 @@ export class PreparationRepository {
           ? available
           : quantityNeeded;
         const totalCost = roundCost(lot.unitCost.mul(consumed), 2);
-        allocations.push({
+        inventoryTransactions.push({
+          inventoryItemId: item.inventoryItemId,
           inventoryLotId: lot.id,
           quantity: consumed,
           unitCost: lot.unitCost,
@@ -525,31 +573,50 @@ export class PreparationRepository {
         quantity,
         unitCost,
         totalCost: roundCost(unitCost.mul(quantity), 2),
-        allocations,
       });
     }
 
-    return planned;
+    return { items: planned, inventoryTransactions };
   }
 
   private async decreaseLotQuantities(
     transaction: Prisma.TransactionClient,
-    items: PlannedItem[],
+    inventoryTransactions: PlannedPreparation['inventoryTransactions'],
   ) {
-    for (const item of items) {
-      for (const allocation of item.allocations) {
-        const result = await transaction.inventoryLot.updateMany({
-          where: {
-            id: allocation.inventoryLotId,
-            remainingQuantity: { gte: allocation.quantity },
-          },
-          data: { remainingQuantity: { decrement: allocation.quantity } },
-        });
-        if (result.count !== 1) {
-          throw new Error();
-        }
+    for (const inventoryTransaction of inventoryTransactions) {
+      const result = await transaction.inventoryLot.updateMany({
+        where: {
+          id: inventoryTransaction.inventoryLotId,
+          remainingQuantity: { gte: inventoryTransaction.quantity },
+        },
+        data: {
+          remainingQuantity: { decrement: inventoryTransaction.quantity },
+        },
+      });
+      if (result.count !== 1) {
+        throw new Error();
       }
     }
+  }
+
+  private createPreparationOutTransactions(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    preparationId: string,
+    inventoryTransactions: PlannedPreparation['inventoryTransactions'],
+  ) {
+    if (!inventoryTransactions.length) {
+      return;
+    }
+
+    return transaction.inventoryTransaction.createMany({
+      data: inventoryTransactions.map((inventoryTransaction) => ({
+        ...inventoryTransaction,
+        organizationId,
+        type: InventoryTransactionType.PREPARATION_OUT,
+        referenceId: preparationId,
+      })),
+    });
   }
 
   private async createPreparationItems(
@@ -558,10 +625,6 @@ export class PreparationRepository {
     items: PlannedItem[],
   ) {
     for (const item of items) {
-      const firstLotId = item.allocations[0]?.inventoryLotId;
-      if (!firstLotId) {
-        throw new Error();
-      }
       await transaction.preparationItem.create({
         data: {
           ...(item.id && { id: item.id }),
@@ -570,14 +633,6 @@ export class PreparationRepository {
           quantity: item.quantity,
           unitCost: item.unitCost,
           totalCost: item.totalCost,
-          allocations: {
-            create: item.allocations.map((allocation) => ({
-              inventoryLotId: allocation.inventoryLotId,
-              quantity: allocation.quantity,
-              unitCost: allocation.unitCost,
-              totalCost: allocation.totalCost,
-            })),
-          },
         },
       });
     }

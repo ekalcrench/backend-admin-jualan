@@ -13,20 +13,6 @@ class PreparationInventoryItemDto {
   unit!: string;
 }
 
-class PreparationItemLotResponseDto {
-  @ApiProperty({ format: 'uuid' })
-  inventoryLotId!: string;
-
-  @ApiProperty()
-  quantity!: number;
-
-  @ApiProperty()
-  unitCost!: number;
-
-  @ApiProperty()
-  totalCost!: number;
-}
-
 class PreparationItemResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -45,9 +31,6 @@ class PreparationItemResponseDto {
 
   @ApiProperty({ type: PreparationInventoryItemDto })
   inventoryItem!: PreparationInventoryItemDto;
-
-  @ApiProperty({ type: [PreparationItemLotResponseDto] })
-  lotAllocations!: PreparationItemLotResponseDto[];
 }
 
 export class PreparationResponseDto extends BaseResponseDto {

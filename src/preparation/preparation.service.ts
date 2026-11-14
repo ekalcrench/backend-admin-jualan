@@ -234,12 +234,6 @@ export class PreparationService {
         unitCost: item.unitCost.toNumber(),
         totalCost: item.totalCost.toNumber(),
         inventoryItem: item.inventoryItem,
-        lotAllocations: item.allocations.map((allocation) => ({
-          inventoryLotId: allocation.inventoryLotId,
-          quantity: allocation.quantity.toNumber(),
-          unitCost: allocation.unitCost.toNumber(),
-          totalCost: allocation.totalCost.toNumber(),
-        })),
       })),
     };
   }

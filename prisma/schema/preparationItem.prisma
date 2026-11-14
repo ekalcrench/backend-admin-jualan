@@ -7,9 +7,8 @@ model PreparationItem {
   unitCost  Decimal @map("unit_cost") @db.Decimal(15, 3)
   totalCost Decimal @map("total_cost") @db.Decimal(15, 2)
 
-  preparation   Preparation                     @relation(fields: [preparationId], references: [id], onDelete: Cascade)
-  inventoryItem InventoryItem                   @relation(fields: [inventoryItemId], references: [id])
-  allocations   PreparationItemLotConsumption[]
+  preparation   Preparation   @relation(fields: [preparationId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
 
   @@index([preparationId])
   @@map("preparation_items")

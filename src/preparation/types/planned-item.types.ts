@@ -1,5 +1,4 @@
 import { Prisma } from '../../../prisma/generated/prisma/client.js';
-import { PlannedAllocation } from './planned-allocation.types.js';
 
 export type PlannedItem = {
   id?: string;
@@ -7,5 +6,4 @@ export type PlannedItem = {
   quantity: Prisma.Decimal;
   unitCost: Prisma.Decimal;
   totalCost: Prisma.Decimal;
-  allocations: PlannedAllocation[];
 };
