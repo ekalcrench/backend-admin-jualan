@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -55,6 +56,9 @@ export class OrganizationController {
   @ApiOperation({ summary: 'Create a new organization' })
   @ApiCreatedResponse({ type: OrganizationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
+  @ApiConflictResponse({
+    description: 'Username or social media already exists',
+  })
   create(@Body() dto: CreateOrganizationDto) {
     return this.organizationService.create(dto);
   }
@@ -64,6 +68,9 @@ export class OrganizationController {
   @ApiOperation({ summary: 'Update an organization by id' })
   @ApiOkResponse({ type: OrganizationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
+  @ApiConflictResponse({
+    description: 'Username or social media already exists',
+  })
   @ApiNotFoundResponse({ description: 'Organization not found' })
   update(@Param('id') id: string, @Body() dto: UpdateOrganizationDto) {
     return this.organizationService.update(id, dto);

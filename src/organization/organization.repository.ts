@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Injectable } from '@nestjs/common';
 import { sortMap } from './constants/sort-map.constants.js';
 import { FindByPagesParams } from './types/find-by-pages-params.types.js';
+import { organizationInclude } from './constants/response-include.constants.js';
 
 @Injectable()
 export class OrganizationRepository {
@@ -39,6 +40,22 @@ export class OrganizationRepository {
                 contains: search,
               },
             },
+            {
+              username: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
+              socialMedias: {
+                some: {
+                  username: {
+                    contains: search,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
           ],
         }
       : {};
@@ -49,6 +66,7 @@ export class OrganizationRepository {
         take: size,
         where,
         orderBy: sortMap[sortBy] ?? sortMap['-createdAt'],
+        include: organizationInclude,
       }),
 
       this.prisma.organization.count({
@@ -63,15 +81,25 @@ export class OrganizationRepository {
   }
 
   findById(id: string) {
-    return this.prisma.organization.findUnique({ where: { id } });
+    return this.prisma.organization.findUnique({
+      where: { id },
+      include: organizationInclude,
+    });
   }
 
   create(data: Prisma.OrganizationCreateInput) {
-    return this.prisma.organization.create({ data });
+    return this.prisma.organization.create({
+      data,
+      include: organizationInclude,
+    });
   }
 
   update(id: string, data: Prisma.OrganizationUpdateInput) {
-    return this.prisma.organization.update({ where: { id }, data });
+    return this.prisma.organization.update({
+      where: { id },
+      data,
+      include: organizationInclude,
+    });
   }
 
   delete(id: string) {

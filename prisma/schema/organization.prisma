@@ -2,6 +2,7 @@ model Organization {
   id String @id @default(uuid()) @db.Uuid
 
   name       String  @db.VarChar(255)
+  username   String? @unique @db.VarChar(30)
   address    String  @db.VarChar(255)
   email      String  @db.VarChar(255)
   phone      String  @db.VarChar(16)
@@ -20,6 +21,7 @@ model Organization {
   products              Product[]
   purchases             Purchase[]
   tables                Table[]
+  socialMedias          OrganizationSocialMedia[]
 
   @@index([createdAt])
   @@map("organizations")

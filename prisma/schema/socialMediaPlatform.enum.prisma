@@ -1,0 +1,11 @@
+enum SocialMediaPlatform {
+  INSTAGRAM
+  TIKTOK
+  FACEBOOK
+  YOUTUBE
+  WHATSAPP
+  X
+  THREADS
+
+  @@map("social_media_platform")
+}
