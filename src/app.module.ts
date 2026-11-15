@@ -6,7 +6,6 @@ import { AuthModule } from './auth/auth.module.js';
 import { OrganizationUserModule } from './organization-user/organization-user.module.js';
 import { InventoryItemModule } from './inventory-item/inventory-item.module.js';
 import { PurchaseModule } from './purchase/purchase.module.js';
-import { InitModule } from './init/init.module.js';
 import { InventoryLotModule } from './inventory-lot/inventory-lot.module.js';
 import { ProductModule } from './product/product.module.js';
 import { OrderModule } from './order/order.module.js';
@@ -29,7 +28,6 @@ import { CashTransactionModule } from './cash-transaction/cash-transaction.modul
     ProductModule,
     PurchaseModule,
     UserModule,
-    ...(process.env.NODE_ENV === 'development' ? [InitModule] : []),
   ],
 })
 export class AppModule {}
