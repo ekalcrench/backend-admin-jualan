@@ -2,7 +2,7 @@ model InventoryTransaction {
   id              String @id @default(uuid()) @db.Uuid
   organizationId  String @map("organization_id") @db.Uuid
   inventoryItemId String @map("inventory_item_id") @db.Uuid
-  inventoryLotId  String @default("4cf5dd49-eb63-4a51-b577-e7b2a08923f0") @map("inventory_lot_id") @db.Uuid
+  inventoryLotId  String @map("inventory_lot_id") @db.Uuid
 
   // Untuk relationship dengan table mana berdasarkan type apa
   type        InventoryTransactionType

@@ -2,10 +2,10 @@ model Organization {
   id String @id @default(uuid()) @db.Uuid
 
   name       String  @db.VarChar(255)
-  address    String  @default("") @db.VarChar(255)
-  email      String  @default("") @db.VarChar(255)
-  phone      String  @default("") @db.VarChar(16)
-  logoBase64 String? @default("") @map("logo_base64")
+  address    String  @db.VarChar(255)
+  email      String  @db.VarChar(255)
+  phone      String  @db.VarChar(16)
+  logoBase64 String? @map("logo_base64")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
