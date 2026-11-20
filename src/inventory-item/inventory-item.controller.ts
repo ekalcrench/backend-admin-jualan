@@ -25,6 +25,7 @@ import { CreateInventoryItemDto } from './dto/create-inventory-item.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { InventoryItemGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
 import { InventoryItemResponseDto } from './dto/inventory-item-response.dto.js';
+import { InventoryItemAssetsResponseDto } from './dto/inventory-item-assets-response.dto.js';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
 import { InventoryItemService } from './inventory-item.service.js';
 import { InventoryItemOptionsResponseDto } from './dto/inventory-item-options-response.dto.js';
@@ -62,6 +63,18 @@ export class InventoryItemController {
   @ApiOkResponse({ type: InventoryItemOptionsResponseDto, isArray: true })
   findOptions(@Req() request: AuthenticatedRequest) {
     return this.inventoryItemService.findOptions(request.user);
+  }
+
+  @Get('assets')
+  @OrganizationRoles(
+    OrganizationUserRole.OWNER,
+    OrganizationUserRole.ADMIN,
+    OrganizationUserRole.MEMBER,
+  )
+  @ApiOperation({ summary: 'Retrieve total inventory asset value' })
+  @ApiOkResponse({ type: InventoryItemAssetsResponseDto })
+  getAssets(@Req() request: AuthenticatedRequest) {
+    return this.inventoryItemService.getAssets(request.user);
   }
 
   @Get(':id')

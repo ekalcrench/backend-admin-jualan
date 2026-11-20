@@ -7,6 +7,7 @@ import {
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
+import { InventoryItemAssetsResponseDto } from './dto/inventory-item-assets-response.dto.js';
 import { InventoryItemRepository } from './inventory-item.repository.js';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
 import { UserRequestHeader } from '../common/types/user-request-header.types.js';
@@ -52,6 +53,16 @@ export class InventoryItemService {
     return this.inventoryItemRepository.findOptions(
       this.requireOrganizationId(context),
     );
+  }
+
+  async getAssets(
+    context: UserRequestHeader,
+  ): Promise<InventoryItemAssetsResponseDto> {
+    const totalAssets = await this.inventoryItemRepository.getAssets(
+      this.requireOrganizationId(context),
+    );
+
+    return { totalAssets: totalAssets.toNumber() };
   }
 
   async create(dto: CreateInventoryItemDto, context: UserRequestHeader) {

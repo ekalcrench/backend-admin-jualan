@@ -162,6 +162,21 @@ export class InventoryItemRepository {
     });
   }
 
+  async getAssets(organizationId: string) {
+    const [result] = await this.prisma.$queryRaw<
+      Array<{ totalAssets: Prisma.Decimal }>
+    >(Prisma.sql`
+      SELECT COALESCE(SUM(lot.unit_cost * lot.remaining_quantity), 0) AS "totalAssets"
+      FROM inventory_items AS item
+      LEFT JOIN inventory_lots AS lot
+        ON lot.inventory_item_id = item.id
+      WHERE item.organization_id = CAST(${organizationId} AS uuid)
+        AND item.is_active = true
+    `);
+
+    return result.totalAssets;
+  }
+
   create(data: Prisma.InventoryItemCreateInput) {
     return this.prisma.inventoryItem.create({ data, include: itemWithLots });
   }
