@@ -3,7 +3,7 @@ model OrganizationSocialMedia {
   organizationId String @map("organization_id") @db.Uuid
 
   platform SocialMediaPlatform
-  username String              @unique @db.VarChar(30)
+  username String              @db.VarChar(30)
 
   sortOrder Int @default(0) @map("sort_order")
 
@@ -13,7 +13,6 @@ model OrganizationSocialMedia {
   // Relationships
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, platform])
-  @@index([organizationId])
+  @@unique([organizationId, platform, username])
   @@map("organization_social_medias")
 }
