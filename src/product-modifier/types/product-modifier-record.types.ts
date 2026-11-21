@@ -2,6 +2,7 @@ import { Prisma } from '../../../prisma/generated/prisma/client.js';
 import {
   productModifierGroupDetailInclude,
   productModifierGroupListInclude,
+  productModifierOptionInclude,
 } from '../constants/response-include.constants.js';
 
 export type ProductModifierGroupListRecord =
@@ -15,11 +16,20 @@ export type ProductModifierGroupDetailRecord =
   }>;
 
 export type ProductModifierOptionRecord =
-  Prisma.ProductModifierOptionGetPayload<Record<string, never>>;
+  Prisma.ProductModifierOptionGetPayload<{
+    include: typeof productModifierOptionInclude;
+  }>;
 
 export type ProductModifierOptionWithGroupRecord =
   Prisma.ProductModifierOptionGetPayload<{
     include: {
+      inventoryItem: {
+        select: {
+          id: true;
+          name: true;
+          unit: true;
+        };
+      };
       modifierGroup: {
         select: {
           id: true;
@@ -36,7 +46,9 @@ export type ProductModifierAssignmentsRecord = Prisma.ProductGetPayload<{
       include: {
         modifierGroup: {
           include: {
-            options: true;
+            options: {
+              include: typeof productModifierOptionInclude;
+            };
           };
         };
       };

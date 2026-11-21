@@ -27,6 +27,7 @@ import { CreateTakeawayOrderDto } from './dto/create-takeaway-order.dto.js';
 import { CreateDineInOrderDto } from './dto/create-dine-in-order.dto.js';
 import { UpdateDineInOrderDto } from './dto/update-dine-in-order.dto.js';
 import { UpdateTakeawayOrderDto } from './dto/update-takeaway-order.dto.js';
+import { OrderModifierValidationError } from '../product-modifier/errors/order-modifier-validation.error.js';
 
 @Injectable()
 export class OrderService {
@@ -237,15 +238,11 @@ export class OrderService {
         },
         dto.orderItems,
       );
-      if (order === 'product-not-found') {
-        throw new NotFoundException(
-          'One or more products were not found in this organization',
-        );
-      }
       this.throwIfOrderTypeError(order);
       return this.toResponse(order);
     } catch (error) {
       this.throwIfInsufficientInventory(error);
+      this.throwIfModifierValidationError(error);
       this.throwIfDuplicateOrderNumber(error);
       throw error;
     }
@@ -333,15 +330,11 @@ export class OrderService {
           'One or more order items were not found for this order',
         );
       }
-      if (order === 'product-not-found') {
-        throw new NotFoundException(
-          'One or more products were not found in this organization',
-        );
-      }
       this.throwIfOrderTypeError(order);
       return this.toResponse(order);
     } catch (error) {
       this.throwIfInsufficientInventory(error);
+      this.throwIfModifierValidationError(error);
       this.throwIfDuplicateOrderNumber(error);
       throw error;
     }
@@ -407,6 +400,8 @@ export class OrderService {
       }
       return {
         productId: item.productId,
+        quantity: item.quantity,
+        modifierOptionIds: item.modifierOptionIds ?? [],
         itemData: {},
         createData: {
           product: { connect: { id: item.productId } },
@@ -419,6 +414,10 @@ export class OrderService {
     return {
       id: item.id,
       ...(item.productId !== undefined && { productId: item.productId }),
+      ...(item.quantity !== undefined && { quantity: item.quantity }),
+      ...(item.modifierOptionIds !== undefined && {
+        modifierOptionIds: item.modifierOptionIds,
+      }),
       itemData: {
         ...(item.productId !== undefined && {
           product: { connect: { id: item.productId } },
@@ -477,13 +476,34 @@ export class OrderService {
       status: order.status,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
-      orderItems: order.items.map((item) => ({
-        id: item.id,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice.toNumber(),
-        unitCost: item.unitCost.toNumber(),
-        product: item.product,
-      })),
+      orderItems: order.items.map((item) => {
+        const modifierTotal = item.modifiers.reduce(
+          (total, modifier) => total.plus(modifier.unitPrice),
+          new Prisma.Decimal(0),
+        );
+        const unitTotal = item.unitPrice.plus(modifierTotal);
+        const subtotal = unitTotal.mul(item.quantity);
+
+        return {
+          id: item.id,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice.toNumber(),
+          unitCost: item.unitCost.toNumber(),
+          modifierTotal: modifierTotal.toNumber(),
+          unitTotal: unitTotal.toNumber(),
+          subtotal: subtotal.toNumber(),
+          product: item.product,
+          modifiers: item.modifiers.map((modifier) => ({
+            id: modifier.id,
+            modifierGroupId: modifier.modifierGroupId,
+            modifierOptionId: modifier.modifierOptionId,
+            groupName: modifier.groupName,
+            optionName: modifier.optionName,
+            unitPrice: modifier.unitPrice.toNumber(),
+            sortOrder: modifier.sortOrder,
+          })),
+        };
+      }),
     };
   }
 
@@ -585,6 +605,15 @@ export class OrderService {
   private throwIfInsufficientInventory(error: unknown): void {
     if (error instanceof InsufficientOrderInventoryError) {
       throw new ConflictException(error.message);
+    }
+  }
+
+  private throwIfModifierValidationError(error: unknown): void {
+    if (error instanceof OrderModifierValidationError) {
+      if (error.code === 'product-not-found') {
+        throw new NotFoundException(error.message);
+      }
+      throw new BadRequestException(error.message);
     }
   }
 }

@@ -1,6 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsUUID, Min, ValidateIf } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpdateOrderItemDto {
   @ApiPropertyOptional({ format: 'uuid' })
@@ -23,4 +31,17 @@ export class UpdateOrderItemDto {
   @IsInt()
   @Min(1)
   quantity?: number;
+
+  @ApiPropertyOptional({
+    type: [String],
+    format: 'uuid',
+    uniqueItems: true,
+    description:
+      'Replacement modifier selection. Omit to preserve the existing snapshot when the product is unchanged.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  modifierOptionIds?: string[];
 }

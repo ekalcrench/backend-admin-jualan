@@ -8,8 +8,9 @@ model OrderItem {
   unitCost  Decimal @default(0) @map("unit_cost") @db.Decimal(15, 3)
 
   // Relationships
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product             @relation(fields: [productId], references: [id])
+  modifiers OrderItemModifier[]
 
   @@index([orderId])
   @@map("order_items")

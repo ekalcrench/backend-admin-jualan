@@ -187,12 +187,25 @@ export class ProductModifierService {
       throw new BadRequestException('Modifier option price cannot be negative');
     }
 
+    const inventory = this.resolveInventoryConfiguration(
+      dto.inventoryItemId ?? null,
+      dto.inventoryQuantity ?? null,
+    );
+    if (inventory.inventoryItemId) {
+      await this.ensureInventoryItemAssignable(
+        inventory.inventoryItemId,
+        organizationId,
+      );
+    }
+
     try {
       const option = await this.productModifierRepository.createOption({
         modifierGroupId: groupId,
         name: this.normalizeName(dto.name, 'Modifier option'),
         description: dto.description ?? null,
         price: dto.price ?? 0,
+        inventoryItemId: inventory.inventoryItemId,
+        inventoryQuantity: inventory.inventoryQuantity,
         isActive: dto.isActive ?? true,
         sortOrder: dto.sortOrder ?? 0,
       });
@@ -220,6 +233,36 @@ export class ProductModifierService {
       throw new BadRequestException('Modifier option price cannot be negative');
     }
 
+    const existingInventoryItemId = option.inventoryItemId;
+    const existingInventoryQuantity =
+      option.inventoryQuantity?.toNumber() ?? null;
+    const inventoryTouched =
+      dto.inventoryItemId !== undefined || dto.inventoryQuantity !== undefined;
+    let inventoryData: {
+      inventoryItemId?: string | null;
+      inventoryQuantity?: number | null;
+    } = {};
+
+    if (inventoryTouched) {
+      inventoryData = this.resolveInventoryUpdate(
+        existingInventoryItemId,
+        existingInventoryQuantity,
+        dto,
+      );
+      // Only validate the item when the reference is newly assigned or changed.
+      // Keeping an existing (possibly since deactivated) reference must not block
+      // unrelated edits such as price or name changes.
+      if (
+        inventoryData.inventoryItemId &&
+        inventoryData.inventoryItemId !== existingInventoryItemId
+      ) {
+        await this.ensureInventoryItemAssignable(
+          inventoryData.inventoryItemId,
+          organizationId,
+        );
+      }
+    }
+
     try {
       const updated = await this.productModifierRepository.updateOption(id, {
         ...(dto.name !== undefined && {
@@ -229,6 +272,7 @@ export class ProductModifierService {
           description: dto.description,
         }),
         ...(dto.price !== undefined && { price: dto.price }),
+        ...(inventoryTouched && inventoryData),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
       });
@@ -471,6 +515,80 @@ export class ProductModifierService {
     }
   }
 
+  /**
+   * A modifier option either consumes inventory or it does not. The item and the
+   * quantity are configured together; a quantity without an item (or the other
+   * way around) would silently break order inventory consumption, so both are
+   * rejected before writing.
+   */
+  private resolveInventoryConfiguration(
+    inventoryItemId: string | null,
+    inventoryQuantity: number | null,
+  ): { inventoryItemId: string | null; inventoryQuantity: number | null } {
+    if (inventoryQuantity !== null) {
+      if (!Number.isFinite(inventoryQuantity) || inventoryQuantity <= 0) {
+        throw new BadRequestException(
+          'inventoryQuantity must be greater than zero',
+        );
+      }
+    }
+    if (inventoryItemId === null && inventoryQuantity !== null) {
+      throw new BadRequestException(
+        'inventoryQuantity requires inventoryItemId',
+      );
+    }
+    if (inventoryItemId !== null && inventoryQuantity === null) {
+      throw new BadRequestException(
+        'inventoryQuantity is required when inventoryItemId is set',
+      );
+    }
+
+    return { inventoryItemId, inventoryQuantity };
+  }
+
+  private resolveInventoryUpdate(
+    existingInventoryItemId: string | null,
+    existingInventoryQuantity: number | null,
+    dto: UpdateProductModifierOptionDto,
+  ): { inventoryItemId: string | null; inventoryQuantity: number | null } {
+    if (dto.inventoryItemId === null) {
+      if (
+        dto.inventoryQuantity !== undefined &&
+        dto.inventoryQuantity !== null
+      ) {
+        throw new BadRequestException(
+          'inventoryQuantity must be null or omitted when inventoryItemId is null',
+        );
+      }
+      return { inventoryItemId: null, inventoryQuantity: null };
+    }
+
+    return this.resolveInventoryConfiguration(
+      dto.inventoryItemId !== undefined
+        ? dto.inventoryItemId
+        : existingInventoryItemId,
+      dto.inventoryQuantity !== undefined
+        ? dto.inventoryQuantity
+        : existingInventoryQuantity,
+    );
+  }
+
+  private async ensureInventoryItemAssignable(
+    id: string,
+    organizationId: string,
+  ) {
+    const inventoryItem =
+      await this.productModifierRepository.findActiveInventoryItem(
+        id,
+        organizationId,
+      );
+    if (!inventoryItem) {
+      throw new BadRequestException(
+        'One or more inventory items were not found in this organization',
+      );
+    }
+  }
+
   private toGroupResponse(
     group: ProductModifierGroupListRecord,
   ): ProductModifierGroupResponseDto {
@@ -517,6 +635,15 @@ export class ProductModifierService {
       name: option.name,
       description: option.description,
       price: option.price.toNumber(),
+      inventoryItemId: option.inventoryItemId,
+      inventoryQuantity: option.inventoryQuantity?.toNumber() ?? null,
+      inventoryItem: option.inventoryItem
+        ? {
+            id: option.inventoryItem.id,
+            name: option.inventoryItem.name,
+            unit: option.inventoryItem.unit,
+          }
+        : null,
       isActive: option.isActive,
       sortOrder: option.sortOrder,
       createdAt: option.createdAt,

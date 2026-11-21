@@ -10,6 +10,9 @@ export class ProductOptionsResponseDto {
   @ApiProperty({ example: 12500 })
   sellingPrice!: number;
 
+  @ApiProperty({ example: true })
+  isActive!: boolean;
+
   @ApiProperty({
     example: 7,
     minimum: 0,

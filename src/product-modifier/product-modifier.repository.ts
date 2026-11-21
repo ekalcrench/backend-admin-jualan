@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import {
   productModifierGroupDetailInclude,
   productModifierGroupListInclude,
+  productModifierOptionInclude,
   productModifierOptionOrderBy,
 } from './constants/response-include.constants.js';
 import { sortMap } from './constants/sort-map.constants.js';
@@ -109,7 +110,10 @@ export class ProductModifierRepository {
   }
 
   createOption(data: Prisma.ProductModifierOptionUncheckedCreateInput) {
-    return this.prisma.productModifierOption.create({ data });
+    return this.prisma.productModifierOption.create({
+      data,
+      include: productModifierOptionInclude,
+    });
   }
 
   findOptionById(id: string, organizationId: string) {
@@ -130,6 +134,18 @@ export class ProductModifierRepository {
     });
   }
 
+  /**
+   * Only active inventory items of the current organization can be newly
+   * assigned to a modifier option. Inventory items are soft deleted, so an
+   * inactive item is treated as unavailable for new assignments.
+   */
+  findActiveInventoryItem(id: string, organizationId: string) {
+    return this.prisma.inventoryItem.findFirst({
+      where: { id, organizationId, isActive: true },
+      select: { id: true, name: true, unit: true },
+    });
+  }
+
   updateOption(
     id: string,
     data: Prisma.ProductModifierOptionUncheckedUpdateInput,
@@ -137,6 +153,7 @@ export class ProductModifierRepository {
     return this.prisma.productModifierOption.update({
       where: { id },
       data,
+      include: productModifierOptionInclude,
     });
   }
 
@@ -148,6 +165,7 @@ export class ProductModifierRepository {
     return this.prisma.productModifierOption.update({
       where: { id },
       data: { isActive },
+      include: productModifierOptionInclude,
     });
   }
 
@@ -187,6 +205,7 @@ export class ProductModifierRepository {
       return transaction.productModifierOption.findMany({
         where: { modifierGroupId: groupId },
         orderBy: productModifierOptionOrderBy,
+        include: productModifierOptionInclude,
       });
     });
   }
@@ -210,6 +229,7 @@ export class ProductModifierRepository {
                 options: {
                   where: activeOnly ? { isActive: true } : undefined,
                   orderBy: productModifierOptionOrderBy,
+                  include: productModifierOptionInclude,
                 },
               },
             },

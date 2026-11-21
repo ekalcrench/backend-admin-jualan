@@ -10,4 +10,6 @@ export const sortMap: Record<
   '-name': { name: 'desc' },
   sellingPrice: { sellingPrice: 'asc' },
   '-sellingPrice': { sellingPrice: 'desc' },
+  isActive: { isActive: 'asc' },
+  '-isActive': { isActive: 'desc' },
 };

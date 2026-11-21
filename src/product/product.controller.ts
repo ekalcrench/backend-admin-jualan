@@ -28,6 +28,7 @@ import { UpdateProductDto } from './dto/update-product.dto.js';
 import { ProductService } from './product.service.js';
 import { ProductOptionsResponseDto } from './dto/product-options-response.dto.js';
 import { ProductOverviewResponseDto } from './dto/product-overview-response.dto.js';
+import { GetProductOptionsDto } from './dto/get-product-options.dto.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
 import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
 
@@ -54,10 +55,15 @@ export class ProductController {
     OrganizationUserRole.ADMIN,
     OrganizationUserRole.MEMBER,
   )
-  @ApiOperation({ summary: 'Retrieve all product options' })
+  @ApiOperation({
+    summary: 'Retrieve product options, optionally only active products',
+  })
   @ApiOkResponse({ type: ProductOptionsResponseDto, isArray: true })
-  findOptions(@Req() request: AuthenticatedRequest) {
-    return this.productService.findOptions(request.user);
+  findOptions(
+    @Query() query: GetProductOptionsDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productService.findOptions(query, request.user);
   }
 
   @Get('lowest-stocks')

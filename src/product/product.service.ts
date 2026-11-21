@@ -8,6 +8,7 @@ import {
 import { Prisma } from '../../prisma/generated/prisma/client.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetProductOptionsDto } from './dto/get-product-options.dto.js';
 import { UpdateProductIngredientDto } from './dto/update-product-ingredient.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { ProductRepository } from './product.repository.js';
@@ -49,9 +50,10 @@ export class ProductService {
     };
   }
 
-  async findOptions(userHeader: UserRequestHeader) {
+  async findOptions(dto: GetProductOptionsDto, userHeader: UserRequestHeader) {
     const products = await this.productRepository.findOptions(
       this.requireOrganizationId(userHeader),
+      dto.activeOnly ?? false,
     );
     const remainingStockByInventoryItemId =
       await this.getRemainingStockByInventoryItemIds(
@@ -127,7 +129,11 @@ export class ProductService {
     try {
       const product = await this.productRepository.create(
         organizationId,
-        { name: dto.name, sellingPrice: dto.sellingPrice },
+        {
+          name: dto.name,
+          sellingPrice: dto.sellingPrice,
+          isActive: dto.isActive ?? true,
+        },
         dto.productIngredients,
       );
       const remainingStockByInventoryItemId =
@@ -195,6 +201,7 @@ export class ProductService {
       ...(dto.sellingPrice !== undefined && {
         sellingPrice: dto.sellingPrice,
       }),
+      ...(dto.isActive !== undefined && { isActive: dto.isActive }),
     };
 
     try {
@@ -320,6 +327,7 @@ export class ProductService {
       id: product.id,
       name: product.name,
       sellingPrice: product.sellingPrice.toNumber(),
+      isActive: product.isActive,
       stock: this.calculateStock(
         product.productIngredients,
         remainingStockByInventoryItemId,
@@ -338,6 +346,7 @@ export class ProductService {
       organizationId: product.organizationId,
       name: product.name,
       sellingPrice: product.sellingPrice.toNumber(),
+      isActive: product.isActive,
       stock: this.calculateStock(
         product.productIngredients,
         remainingStockByInventoryItemId,

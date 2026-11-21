@@ -1,0 +1,31 @@
+model OrderItemModifier {
+  id          String @id @default(uuid()) @db.Uuid
+  orderItemId String @map("order_item_id") @db.Uuid
+
+  modifierGroupId  String? @map("modifier_group_id") @db.Uuid
+  modifierOptionId String? @map("modifier_option_id") @db.Uuid
+
+  groupName  String  @map("group_name") @db.VarChar(255)
+  optionName String  @map("option_name") @db.VarChar(255)
+  unitPrice  Decimal @map("unit_price") @db.Decimal(15, 2)
+  sortOrder  Int     @default(0) @map("sort_order")
+
+  // Inventory consumption snapshot taken from the modifier master data at order time.
+  // Intentionally a plain value (no foreign key) so historical orders survive inventory
+  // item renames, deactivation, or deletion.
+  inventoryItemId   String?  @map("inventory_item_id") @db.Uuid
+  inventoryQuantity Decimal? @map("inventory_quantity") @db.Decimal(15, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relationships
+  orderItem      OrderItem              @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  modifierGroup  ProductModifierGroup?  @relation(fields: [modifierGroupId], references: [id], onDelete: SetNull)
+  modifierOption ProductModifierOption? @relation(fields: [modifierOptionId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId])
+  @@index([modifierGroupId])
+  @@index([modifierOptionId])
+  @@index([inventoryItemId])
+  @@map("order_item_modifiers")
+}

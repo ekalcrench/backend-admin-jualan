@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -32,6 +33,29 @@ export class CreateProductModifierOptionDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   price?: number;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Inventory item consumed when this option is selected. Omit or send null for options that do not consume inventory.',
+  })
+  @IsOptional()
+  @IsUUID()
+  inventoryItemId?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    minimum: 0,
+    example: 30,
+    description:
+      'Inventory quantity consumed per selected option, in the inventory item base unit. Required when inventoryItemId is set and must be greater than zero.',
+  })
+  @Type(() => Number)
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  inventoryQuantity?: number | null;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()

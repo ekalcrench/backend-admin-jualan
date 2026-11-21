@@ -1,10 +1,14 @@
 model ProductModifierOption {
-  id              String @id @default(uuid()) @db.Uuid
-  modifierGroupId String @map("modifier_group_id") @db.Uuid
+  id              String  @id @default(uuid()) @db.Uuid
+  modifierGroupId String  @map("modifier_group_id") @db.Uuid
+  inventoryItemId String? @map("inventory_item_id") @db.Uuid
 
   name        String  @db.VarChar(255)
   description String? @db.Text
   price       Decimal @default(0) @db.Decimal(15, 2)
+
+  // Inventory quantity consumed for one selected option, in the inventory item base unit.
+  inventoryQuantity Decimal? @map("inventory_quantity") @db.Decimal(15, 2)
 
   isActive  Boolean @default(true) @map("is_active")
   sortOrder Int     @default(0) @map("sort_order")
@@ -13,9 +17,14 @@ model ProductModifierOption {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
-  modifierGroup ProductModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+  modifierGroup      ProductModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+  // Restrict keeps a referenced inventory item from being physically deleted. The
+  // inventory service falls back to soft deletion (isActive = false) in that case.
+  inventoryItem      InventoryItem?       @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  orderItemModifiers OrderItemModifier[]
 
   @@unique([modifierGroupId, name])
   @@index([modifierGroupId, isActive, sortOrder])
+  @@index([inventoryItemId])
   @@map("product_modifier_options")
 }

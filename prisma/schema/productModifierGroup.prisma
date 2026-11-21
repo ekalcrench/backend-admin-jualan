@@ -16,9 +16,10 @@ model ProductModifierGroup {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
-  organization    Organization                  @relation(fields: [organizationId], references: [id])
-  options         ProductModifierOption[]
-  productMappings ProductModifierGroupMapping[]
+  organization       Organization                  @relation(fields: [organizationId], references: [id])
+  options            ProductModifierOption[]
+  productMappings    ProductModifierGroupMapping[]
+  orderItemModifiers OrderItemModifier[]
 
   @@unique([organizationId, name])
   @@index([organizationId, isActive, sortOrder])

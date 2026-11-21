@@ -5,6 +5,16 @@ export const productModifierOptionOrderBy = [
   { createdAt: 'asc' },
 ] satisfies Prisma.ProductModifierOptionOrderByWithRelationInput[];
 
+export const productModifierOptionInclude = {
+  inventoryItem: {
+    select: {
+      id: true,
+      name: true,
+      unit: true,
+    },
+  },
+} satisfies Prisma.ProductModifierOptionInclude;
+
 export const productModifierGroupListInclude = {
   _count: {
     select: {
@@ -17,6 +27,7 @@ export const productModifierGroupListInclude = {
 export const productModifierGroupDetailInclude = {
   options: {
     orderBy: productModifierOptionOrderBy,
+    include: productModifierOptionInclude,
   },
   productMappings: {
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],

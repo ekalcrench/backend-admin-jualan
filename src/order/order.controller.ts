@@ -87,12 +87,12 @@ export class OrderController {
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Create an unpaid order with type-specific details and current product selling prices',
+      'Create an unpaid order with selected product modifiers and current database prices',
   })
   @ApiCreatedResponse({ type: OrderResponseDto })
   @ApiBadRequestResponse({
     description:
-      'Invalid request payload or dine-in guest count exceeds table capacity',
+      'Invalid request payload, invalid modifier selection, or dine-in guest count exceeds table capacity',
   })
   @ApiConflictResponse({
     description: 'Stok untuk inventory item tidak mencukupi',
@@ -125,13 +125,13 @@ export class OrderController {
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Update an unpaid order and its type-specific details; use deletedOrderItemIds to remove selected items',
+      'Update an unpaid order and its type-specific details; use deletedOrderItemIds to remove selected items and modifierOptionIds to replace modifier snapshots',
   })
   @ApiParam({ name: 'id', description: 'Order UUID' })
   @ApiOkResponse({ type: OrderResponseDto })
   @ApiBadRequestResponse({
     description:
-      'Invalid request payload or dine-in guest count exceeds table capacity',
+      'Invalid request payload, invalid modifier selection, or dine-in guest count exceeds table capacity',
   })
   @ApiConflictResponse({
     description: 'Paid orders cannot be updated',

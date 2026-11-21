@@ -34,15 +34,17 @@ export class ProductRepository {
     return { items, total };
   }
 
-  findOptions(organizationId: string) {
+  findOptions(organizationId: string, activeOnly = false) {
     return this.prisma.product.findMany({
       where: {
         organizationId,
+        ...(activeOnly && { isActive: true }),
       },
       select: {
         id: true,
         name: true,
         sellingPrice: true,
+        isActive: true,
         productIngredients: {
           select: {
             inventoryItemId: true,
@@ -89,7 +91,10 @@ export class ProductRepository {
 
   create(
     organizationId: string,
-    data: Pick<Prisma.ProductCreateInput, 'name' | 'sellingPrice'>,
+    data: Pick<
+      Prisma.ProductCreateInput,
+      'name' | 'sellingPrice' | 'isActive'
+    >,
     productIngredients: Array<{ inventoryItemId: string; quantity: number }>,
   ) {
     return this.prisma.product.create({

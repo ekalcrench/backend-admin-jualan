@@ -5,6 +5,7 @@ import { ProductModifierGroupController } from './product-modifier-group.control
 import { ProductModifierOptionController } from './product-modifier-option.controller.js';
 import { ProductModifierRepository } from './product-modifier.repository.js';
 import { ProductModifierService } from './product-modifier.service.js';
+import { ProductModifierOrderingService } from './product-modifier-ordering.service.js';
 
 @Module({
   imports: [PrismaModule],
@@ -13,6 +14,11 @@ import { ProductModifierService } from './product-modifier.service.js';
     ProductModifierGroupController,
     ProductModifierOptionController,
   ],
-  providers: [ProductModifierRepository, ProductModifierService],
+  providers: [
+    ProductModifierRepository,
+    ProductModifierService,
+    ProductModifierOrderingService,
+  ],
+  exports: [ProductModifierOrderingService],
 })
 export class ProductModifierModule {}

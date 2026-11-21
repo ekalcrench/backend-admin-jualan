@@ -46,6 +46,12 @@ export class ProductResponseDto extends BaseResponseDto {
   sellingPrice!: number;
 
   @ApiProperty({
+    example: true,
+    description: 'Inactive products cannot be added to new orders',
+  })
+  isActive!: boolean;
+
+  @ApiProperty({
     example: 7,
     minimum: 0,
     description: 'Maximum whole products that can be made with current stock',
