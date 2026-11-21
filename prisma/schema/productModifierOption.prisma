@@ -1,0 +1,21 @@
+model ProductModifierOption {
+  id              String @id @default(uuid()) @db.Uuid
+  modifierGroupId String @map("modifier_group_id") @db.Uuid
+
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+  price       Decimal @default(0) @db.Decimal(15, 2)
+
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  modifierGroup ProductModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([modifierGroupId, name])
+  @@index([modifierGroupId, isActive, sortOrder])
+  @@map("product_modifier_options")
+}

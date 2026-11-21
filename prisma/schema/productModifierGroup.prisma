@@ -1,0 +1,26 @@
+model ProductModifierGroup {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+
+  isRequired   Boolean @default(false) @map("is_required")
+  minSelection Int     @default(0) @map("min_selection")
+  maxSelection Int     @default(1) @map("max_selection")
+  isMultiple   Boolean @default(false) @map("is_multiple")
+  isActive     Boolean @default(true) @map("is_active")
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  organization    Organization                  @relation(fields: [organizationId], references: [id])
+  options         ProductModifierOption[]
+  productMappings ProductModifierGroupMapping[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive, sortOrder])
+  @@map("product_modifier_groups")
+}

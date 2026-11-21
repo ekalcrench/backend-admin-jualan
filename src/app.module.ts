@@ -8,6 +8,7 @@ import { InventoryItemModule } from './inventory-item/inventory-item.module.js';
 import { PurchaseModule } from './purchase/purchase.module.js';
 import { InventoryLotModule } from './inventory-lot/inventory-lot.module.js';
 import { ProductModule } from './product/product.module.js';
+import { ProductModifierModule } from './product-modifier/product-modifier.module.js';
 import { OrderModule } from './order/order.module.js';
 import { PreparationModule } from './preparation/preparation.module.js';
 import { InventoryTransactionModule } from './inventory-transaction/inventory-transaction.module.js';
@@ -25,6 +26,7 @@ import { CashTransactionModule } from './cash-transaction/cash-transaction.modul
     OrganizationModule,
     OrganizationUserModule,
     PreparationModule,
+    ProductModifierModule,
     ProductModule,
     PurchaseModule,
     UserModule,

@@ -18,6 +18,7 @@ model Organization {
   orders                Order[]
   organizationUsers     OrganizationUser[]
   preparations          Preparation[]
+  productModifierGroups ProductModifierGroup[]
   products              Product[]
   purchases             Purchase[]
   tables                Table[]
