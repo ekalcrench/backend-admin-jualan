@@ -20,6 +20,7 @@ import type {
 const organizationId = '11111111-1111-4111-8111-111111111111';
 const groupId = '33333333-3333-4333-8333-333333333333';
 const optionId = '44444444-4444-4444-8444-444444444444';
+const inventoryItemId = '99999999-9999-4999-8999-999999999999';
 const productId = '55555555-5555-4555-8555-555555555555';
 const secondProductId = '66666666-6666-4666-8666-666666666666';
 const mappingId = '77777777-7777-4777-8777-777777777777';
@@ -43,6 +44,9 @@ const buildOption = (
   name: 'Ayam Suwir',
   description: null,
   price: new Prisma.Decimal(2500),
+  inventoryItemId: null,
+  inventoryQuantity: null,
+  inventoryItem: null,
   isActive: true,
   sortOrder: 0,
   createdAt,
@@ -159,6 +163,7 @@ const createMockRepository = (): MockRepository => ({
   deleteGroup: jest.fn(),
   createOption: jest.fn(),
   findOptionById: jest.fn(),
+  findActiveInventoryItem: jest.fn(),
   updateOption: jest.fn(),
   deleteOption: jest.fn(),
   setOptionActive: jest.fn(),
@@ -361,6 +366,250 @@ describe('ProductModifierService', () => {
         service.createOption(groupId, { name: 'Ayam', price: -1 }, user),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(repository.createOption).not.toHaveBeenCalled();
+    });
+
+    it('creates an option linked to an active inventory item', async () => {
+      repository.findGroupSummary.mockResolvedValue({ id: groupId });
+      repository.findActiveInventoryItem.mockResolvedValue({
+        id: inventoryItemId,
+        name: 'Ayam Suwir',
+        unit: 'GRAM',
+      });
+      repository.createOption.mockResolvedValue(
+        buildOption({
+          inventoryItemId,
+          inventoryQuantity: new Prisma.Decimal(30),
+          inventoryItem: {
+            id: inventoryItemId,
+            name: 'Ayam Suwir',
+            unit: 'GRAM',
+          },
+        }),
+      );
+
+      const result = await service.createOption(
+        groupId,
+        {
+          name: 'Ayam Suwir',
+          price: 2500,
+          inventoryItemId,
+          inventoryQuantity: 30,
+        },
+        user,
+      );
+
+      expect(repository.findActiveInventoryItem).toHaveBeenCalledWith(
+        inventoryItemId,
+        organizationId,
+      );
+      expect(repository.createOption).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modifierGroupId: groupId,
+          inventoryItemId,
+          inventoryQuantity: 30,
+        }),
+      );
+      expect(result.inventoryQuantity).toBe(30);
+      expect(result.inventoryItem).toEqual({
+        id: inventoryItemId,
+        name: 'Ayam Suwir',
+        unit: 'GRAM',
+      });
+    });
+
+    it('creates an option without inventory integration', async () => {
+      repository.findGroupSummary.mockResolvedValue({ id: groupId });
+      repository.createOption.mockResolvedValue(buildOption());
+
+      const result = await service.createOption(
+        groupId,
+        { name: 'Ayam Suwir' },
+        user,
+      );
+
+      expect(repository.findActiveInventoryItem).not.toHaveBeenCalled();
+      expect(repository.createOption).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inventoryItemId: null,
+          inventoryQuantity: null,
+        }),
+      );
+      expect(result.inventoryItem).toBeNull();
+      expect(result.inventoryQuantity).toBeNull();
+    });
+
+    it('rejects an inventory item from another organization or an inactive item', async () => {
+      repository.findGroupSummary.mockResolvedValue({ id: groupId });
+      repository.findActiveInventoryItem.mockResolvedValue(null);
+
+      await expect(
+        service.createOption(
+          groupId,
+          { name: 'Ayam Suwir', inventoryItemId, inventoryQuantity: 30 },
+          user,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(repository.createOption).not.toHaveBeenCalled();
+    });
+
+    it.each([0, -1, -0.5])(
+      'rejects a non-positive inventory quantity (%s)',
+      async (inventoryQuantity) => {
+        repository.findGroupSummary.mockResolvedValue({ id: groupId });
+
+        await expect(
+          service.createOption(
+            groupId,
+            { name: 'Ayam Suwir', inventoryItemId, inventoryQuantity },
+            user,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(repository.createOption).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rejects an inventory item without a quantity', async () => {
+      repository.findGroupSummary.mockResolvedValue({ id: groupId });
+
+      await expect(
+        service.createOption(
+          groupId,
+          { name: 'Ayam Suwir', inventoryItemId },
+          user,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(repository.findActiveInventoryItem).not.toHaveBeenCalled();
+      expect(repository.createOption).not.toHaveBeenCalled();
+    });
+
+    it('rejects a quantity without an inventory item', async () => {
+      repository.findGroupSummary.mockResolvedValue({ id: groupId });
+
+      await expect(
+        service.createOption(
+          groupId,
+          { name: 'Ayam Suwir', inventoryQuantity: 30 },
+          user,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(repository.createOption).not.toHaveBeenCalled();
+    });
+
+    it('rejects clearing the inventory item while keeping a quantity', async () => {
+      repository.findOptionById.mockResolvedValue(
+        buildOption({
+          inventoryItemId,
+          inventoryQuantity: new Prisma.Decimal(30),
+        }),
+      );
+
+      await expect(
+        service.updateOption(
+          optionId,
+          { inventoryItemId: null, inventoryQuantity: 30 },
+          user,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(repository.updateOption).not.toHaveBeenCalled();
+    });
+
+    it('updates inventory configuration using the current option quantity', async () => {
+      repository.findOptionById.mockResolvedValue(buildOption());
+      repository.findActiveInventoryItem.mockResolvedValue({
+        id: inventoryItemId,
+        name: 'Ayam Suwir',
+        unit: 'GRAM',
+      });
+      repository.updateOption.mockResolvedValue(
+        buildOption({
+          inventoryItemId,
+          inventoryQuantity: new Prisma.Decimal(30),
+          inventoryItem: {
+            id: inventoryItemId,
+            name: 'Ayam Suwir',
+            unit: 'GRAM',
+          },
+        }),
+      );
+
+      await service.updateOption(
+        optionId,
+        { inventoryItemId, inventoryQuantity: 30 },
+        user,
+      );
+
+      expect(repository.findActiveInventoryItem).toHaveBeenCalledWith(
+        inventoryItemId,
+        organizationId,
+      );
+      expect(repository.updateOption).toHaveBeenCalledWith(
+        optionId,
+        expect.objectContaining({
+          inventoryItemId,
+          inventoryQuantity: 30,
+        }),
+      );
+    });
+
+    it('rejects changing to an inventory item from another organization', async () => {
+      repository.findOptionById.mockResolvedValue(buildOption());
+      repository.findActiveInventoryItem.mockResolvedValue(null);
+
+      await expect(
+        service.updateOption(
+          optionId,
+          { inventoryItemId, inventoryQuantity: 30 },
+          user,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(repository.updateOption).not.toHaveBeenCalled();
+    });
+
+    it('clears both inventory fields when the item is removed', async () => {
+      repository.findOptionById.mockResolvedValue(
+        buildOption({
+          inventoryItemId,
+          inventoryQuantity: new Prisma.Decimal(30),
+        }),
+      );
+      repository.updateOption.mockResolvedValue(buildOption());
+
+      await service.updateOption(optionId, { inventoryItemId: null }, user);
+
+      expect(repository.findActiveInventoryItem).not.toHaveBeenCalled();
+      expect(repository.updateOption).toHaveBeenCalledWith(
+        optionId,
+        expect.objectContaining({
+          inventoryItemId: null,
+          inventoryQuantity: null,
+        }),
+      );
+    });
+
+    it('updates only the quantity for the already assigned inventory item', async () => {
+      repository.findOptionById.mockResolvedValue(
+        buildOption({
+          inventoryItemId,
+          inventoryQuantity: new Prisma.Decimal(30),
+        }),
+      );
+      repository.updateOption.mockResolvedValue(
+        buildOption({
+          inventoryItemId,
+          inventoryQuantity: new Prisma.Decimal(45),
+        }),
+      );
+
+      await service.updateOption(optionId, { inventoryQuantity: 45 }, user);
+
+      expect(repository.findActiveInventoryItem).not.toHaveBeenCalled();
+      expect(repository.updateOption).toHaveBeenCalledWith(
+        optionId,
+        expect.objectContaining({
+          inventoryItemId,
+          inventoryQuantity: 45,
+        }),
+      );
     });
 
     it('rejects creating an option under a group from another organization', async () => {

@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   IsUUID,
   MaxLength,
@@ -46,7 +47,7 @@ export class CreateProductModifierOptionDto {
 
   @ApiPropertyOptional({
     nullable: true,
-    minimum: 0,
+    minimum: 0.01,
     example: 30,
     description:
       'Inventory quantity consumed per selected option, in the inventory item base unit. Required when inventoryItemId is set and must be greater than zero.',
@@ -54,7 +55,7 @@ export class CreateProductModifierOptionDto {
   @Type(() => Number)
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
+  @IsPositive()
   inventoryQuantity?: number | null;
 
   @ApiPropertyOptional({ default: true })

@@ -14,15 +14,23 @@ const keringId = '88888888-8888-4888-8888-888888888888';
 const inactiveOptionId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const otherOrgOptionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
+const inventoryItemId = '99999999-9999-4999-8999-999999999999';
+
 const option = (
   id: string,
   name: string,
   price: number,
   sortOrder: number,
+  inventory?: { inventoryItemId: string; inventoryQuantity: number },
 ) => ({
   id,
   name,
   price: new Prisma.Decimal(price),
+  inventoryItemId: inventory?.inventoryItemId ?? null,
+  inventoryQuantity:
+    inventory?.inventoryQuantity !== undefined
+      ? new Prisma.Decimal(inventory.inventoryQuantity)
+      : null,
   sortOrder,
 });
 
@@ -61,7 +69,10 @@ const buildProduct = () => ({
         extraGroupId,
         'Extra Isian',
         [
-          option(ayamSuwirId, 'Ayam Suwir', 2500, 0),
+          option(ayamSuwirId, 'Ayam Suwir', 2500, 0, {
+            inventoryItemId,
+            inventoryQuantity: 30,
+          }),
           option(dagingKeringId, 'Daging Kering', 5000, 1),
         ],
         { minSelection: 0, maxSelection: 3, isMultiple: true },
@@ -71,10 +82,7 @@ const buildProduct = () => ({
       modifierGroup: group(
         donenessGroupId,
         'Tingkat Kematangan',
-        [
-          option(keringId, 'Kering', 0, 0),
-          option(normalId, 'Normal', 0, 1),
-        ],
+        [option(keringId, 'Kering', 0, 0), option(normalId, 'Normal', 0, 1)],
         {
           isRequired: true,
           minSelection: 1,
@@ -149,6 +157,33 @@ describe('ProductModifierOrderingService', () => {
       groupName: 'Extra Isian',
       optionName: 'Ayam Suwir',
       sortOrder: 0,
+    });
+  });
+
+  it('snapshots the configured inventory item and quantity for each selected option', async () => {
+    const { findMany, transaction } = createTransaction();
+    findMany.mockResolvedValue([buildProduct()]);
+
+    const result = await service.resolveOrderItems(
+      transaction,
+      organizationId,
+      [
+        {
+          productId,
+          modifierOptionIds: [ayamSuwirId, dagingKeringId, normalId],
+        },
+      ],
+    );
+
+    expect(result[0].modifierSnapshots?.[0]).toMatchObject({
+      optionName: 'Ayam Suwir',
+      inventoryItemId,
+      inventoryQuantity: new Prisma.Decimal(30),
+    });
+    expect(result[0].modifierSnapshots?.[1]).toMatchObject({
+      optionName: 'Daging Kering',
+      inventoryItemId: null,
+      inventoryQuantity: null,
     });
   });
 

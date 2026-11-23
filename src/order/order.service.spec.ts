@@ -1,17 +1,19 @@
 import { jest } from '@jest/globals';
 import {
   BadRequestException,
+  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  OrderStatus,
-  Prisma,
-} from '../../prisma/generated/prisma/client.js';
+import { OrderStatus, Prisma } from '../../prisma/generated/prisma/client.js';
 import { OrderType } from '../../prisma/generated/prisma/enums.js';
 import type { UserRequestHeader } from '../common/types/user-request-header.types.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { UpdateOrderDto } from './dto/update-order.dto.js';
-import { OrderRepository } from './order.repository.js';
+import {
+  InsufficientOrderInventoryError,
+  OrderInventoryReferenceError,
+  OrderRepository,
+} from './order.repository.js';
 import { OrderService } from './order.service.js';
 import { OrderModifierValidationError } from '../product-modifier/errors/order-modifier-validation.error.js';
 import type { OrderWithDetails } from './types/order-with-details.types.js';
@@ -22,6 +24,7 @@ const orderItemId = '33333333-3333-4333-8333-333333333333';
 const modifierId = '44444444-4444-4444-8444-444444444444';
 const modifierTwoId = '55555555-5555-4555-8555-555555555555';
 const groupId = '66666666-6666-4666-8666-666666666666';
+const inventoryItemId = '99999999-9999-4999-8999-999999999999';
 const referenceId = '77777777-7777-4777-8777-777777777777';
 const createdAt = new Date('2026-11-21T00:00:00.000Z');
 
@@ -39,6 +42,7 @@ const buildModifier = (
   optionName: string,
   unitPrice: number,
   sortOrder: number,
+  inventory?: { inventoryItemId: string; inventoryQuantity: number },
 ) => ({
   id,
   orderItemId,
@@ -47,6 +51,11 @@ const buildModifier = (
   groupName: 'Extra Isian',
   optionName,
   unitPrice: new Prisma.Decimal(unitPrice),
+  inventoryItemId: inventory?.inventoryItemId ?? null,
+  inventoryQuantity:
+    inventory?.inventoryQuantity !== undefined
+      ? new Prisma.Decimal(inventory.inventoryQuantity)
+      : null,
   sortOrder,
   createdAt,
 });
@@ -145,9 +154,7 @@ describe('OrderService modifier integration', () => {
 
   beforeEach(() => {
     repository = createRepository();
-    service = new OrderService(
-      repository as unknown as OrderRepository,
-    );
+    service = new OrderService(repository as unknown as OrderRepository);
   });
 
   it('passes modifier option ids to the transaction and returns snapshot totals', async () => {
@@ -179,10 +186,9 @@ describe('OrderService modifier integration', () => {
       unitTotal: 27500,
       subtotal: 55000,
     });
-    expect(result.orderItems[0].modifiers.map((item) => item.optionName)).toEqual([
-      'Ayam Suwir',
-      'Daging Kering',
-    ]);
+    expect(
+      result.orderItems[0].modifiers.map((item) => item.optionName),
+    ).toEqual(['Ayam Suwir', 'Daging Kering']);
   });
 
   it('keeps existing order behavior for a modifier-free product', async () => {
@@ -277,6 +283,55 @@ describe('OrderService modifier integration', () => {
     expect(result.orderItems[0].modifierTotal).toBe(7000);
     expect(result.orderItems[0].unitTotal).toBe(27000);
     expect(result.orderItems[0].subtotal).toBe(54000);
+  });
+
+  it('returns the inventory snapshot stored on each order modifier', async () => {
+    const order = buildOrder();
+    order.items[0].modifiers[0] = buildModifier(
+      modifierId,
+      'Ayam Suwir',
+      2500,
+      0,
+      { inventoryItemId, inventoryQuantity: 30 },
+    );
+    repository.findById.mockResolvedValue(order);
+
+    const result = await service.findById('order-id', user);
+
+    expect(result.orderItems[0].modifiers[0]).toMatchObject({
+      inventoryItemId,
+      inventoryQuantity: 30,
+    });
+    expect(result.orderItems[0].modifiers[1]).toMatchObject({
+      inventoryItemId: null,
+      inventoryQuantity: null,
+    });
+  });
+
+  it('maps insufficient inventory during finalization to 409', async () => {
+    repository.markPaid.mockRejectedValue(
+      new InsufficientOrderInventoryError('Kuah Soto'),
+    );
+
+    await expect(service.markPaid('order-id', user)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  it('maps a missing inventory reference during finalization to 409', async () => {
+    repository.markPaid.mockRejectedValue(new OrderInventoryReferenceError());
+
+    await expect(service.markPaid('order-id', user)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  it('rejects finalizing an already paid order without deducting again', async () => {
+    repository.markPaid.mockResolvedValue('already-paid');
+
+    await expect(service.markPaid('order-id', user)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
   it('passes modifier selections through existing item updates', async () => {

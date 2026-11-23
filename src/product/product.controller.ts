@@ -129,7 +129,8 @@ export class ProductController {
   })
   @ApiNotFoundResponse({ description: 'Product not found' })
   @ApiConflictResponse({
-    description: 'A product associated with orders cannot be deleted',
+    description:
+      'Produk tidak dapat dihapus karena sudah dipakai untuk transaksi',
   })
   delete(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.productService.delete(id, request.user);

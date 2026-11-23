@@ -13,6 +13,7 @@ import { UpdateOrderItemDto } from './dto/update-order-item.dto.js';
 import { UpdateOrderDto } from './dto/update-order.dto.js';
 import {
   InsufficientOrderInventoryError,
+  OrderInventoryReferenceError,
   OrderRepository,
 } from './order.repository.js';
 import { OrderItemChange } from './types/order-item-change.type.js';
@@ -500,6 +501,8 @@ export class OrderService {
             groupName: modifier.groupName,
             optionName: modifier.optionName,
             unitPrice: modifier.unitPrice.toNumber(),
+            inventoryItemId: modifier.inventoryItemId,
+            inventoryQuantity: modifier.inventoryQuantity?.toNumber() ?? null,
             sortOrder: modifier.sortOrder,
           })),
         };
@@ -603,7 +606,10 @@ export class OrderService {
   }
 
   private throwIfInsufficientInventory(error: unknown): void {
-    if (error instanceof InsufficientOrderInventoryError) {
+    if (
+      error instanceof InsufficientOrderInventoryError ||
+      error instanceof OrderInventoryReferenceError
+    ) {
       throw new ConflictException(error.message);
     }
   }

@@ -91,6 +91,65 @@ describe('Product modifier DTO validation', () => {
 
       expect(errors).toHaveLength(0);
     });
+
+    it('accepts an inventory item with a positive quantity', async () => {
+      const errors = await validatePayload(CreateProductModifierOptionDto, {
+        name: 'Ayam Suwir',
+        inventoryItemId: '99999999-9999-4999-8999-999999999999',
+        inventoryQuantity: 30,
+      });
+
+      expect(errors).toHaveLength(0);
+    });
+
+    it('accepts an option without inventory integration', async () => {
+      const errors = await validatePayload(CreateProductModifierOptionDto, {
+        name: 'Ayam Suwir',
+        inventoryItemId: null,
+        inventoryQuantity: null,
+      });
+
+      expect(errors).toHaveLength(0);
+    });
+
+    it('rejects a non-uuid inventory item id', async () => {
+      const errors = await validatePayload(CreateProductModifierOptionDto, {
+        name: 'Ayam Suwir',
+        inventoryItemId: 'not-a-uuid',
+        inventoryQuantity: 30,
+      });
+
+      expect(errors.map((error) => error.property)).toContain(
+        'inventoryItemId',
+      );
+    });
+
+    it.each([0, -1])(
+      'rejects a non-positive inventory quantity (%s)',
+      async (inventoryQuantity) => {
+        const errors = await validatePayload(CreateProductModifierOptionDto, {
+          name: 'Ayam Suwir',
+          inventoryItemId: '99999999-9999-4999-8999-999999999999',
+          inventoryQuantity,
+        });
+
+        expect(errors.map((error) => error.property)).toContain(
+          'inventoryQuantity',
+        );
+      },
+    );
+
+    it('rejects inventory quantities with more than two decimal places', async () => {
+      const errors = await validatePayload(CreateProductModifierOptionDto, {
+        name: 'Ayam Suwir',
+        inventoryItemId: '99999999-9999-4999-8999-999999999999',
+        inventoryQuantity: 30.555,
+      });
+
+      expect(errors.map((error) => error.property)).toContain(
+        'inventoryQuantity',
+      );
+    });
   });
 
   describe('assignment payloads', () => {

@@ -23,6 +23,23 @@ export class OrderItemModifierResponseDto {
   })
   unitPrice!: number;
 
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Inventory item snapshot consumed by this option at order time, if any',
+  })
+  inventoryItemId!: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    minimum: 0,
+    example: 30,
+    description:
+      'Inventory quantity consumed per selected option at order time, in the inventory item base unit',
+  })
+  inventoryQuantity!: number | null;
+
   @ApiProperty({ minimum: 0, example: 0 })
   sortOrder!: number;
 }

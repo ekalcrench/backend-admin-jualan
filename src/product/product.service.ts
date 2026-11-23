@@ -240,7 +240,7 @@ export class ProductService {
     }
     if (result === 'has-orders') {
       throw new ConflictException(
-        'A product associated with orders cannot be deleted',
+        'Produk tidak dapat dihapus karena sudah dipakai untuk transaksi',
       );
     }
 
