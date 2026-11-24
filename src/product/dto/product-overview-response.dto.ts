@@ -6,8 +6,7 @@ export class ProductOverviewResponseDto {
 
   @ApiProperty({
     example: 1,
-    minimum: 0,
-    description: 'Maximum whole products that can be made with current stock',
+    description: 'Remaining manual or inventory-derived product stock',
   })
   stock!: number;
 }

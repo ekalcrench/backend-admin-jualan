@@ -57,6 +57,12 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Inventory tracking and costing
+
+Products and modifier options can track stock independently. FIFO costing,
+strict/negative-stock policies, shortage lots, and historical cost snapshots
+are described in [docs/inventory-costing.md](./docs/inventory-costing.md).
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

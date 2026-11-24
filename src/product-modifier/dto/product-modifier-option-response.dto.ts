@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
+import { InventoryPolicy } from '../../../prisma/generated/prisma/enums.js';
 
 class ModifierOptionInventoryItemDto {
   @ApiProperty({ format: 'uuid' })
@@ -52,6 +53,12 @@ export class ProductModifierOptionResponseDto extends BaseResponseDto {
       'Inventory quantity consumed per selected option, in the inventory item base unit',
   })
   inventoryQuantity!: number | null;
+
+  @ApiProperty({ example: false })
+  trackInventory!: boolean;
+
+  @ApiProperty({ enum: InventoryPolicy, example: InventoryPolicy.STRICT })
+  inventoryPolicy!: InventoryPolicy;
 
   @ApiProperty({
     type: ModifierOptionInventoryItemDto,

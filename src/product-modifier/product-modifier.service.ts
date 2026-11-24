@@ -191,6 +191,11 @@ export class ProductModifierService {
       dto.inventoryItemId ?? null,
       dto.inventoryQuantity ?? null,
     );
+    if (dto.trackInventory && !inventory.inventoryItemId) {
+      throw new BadRequestException(
+        'An inventory item is required when trackInventory is enabled',
+      );
+    }
     if (inventory.inventoryItemId) {
       await this.ensureInventoryItemAssignable(
         inventory.inventoryItemId,
@@ -206,6 +211,8 @@ export class ProductModifierService {
         price: dto.price ?? 0,
         inventoryItemId: inventory.inventoryItemId,
         inventoryQuantity: inventory.inventoryQuantity,
+        trackInventory: dto.trackInventory ?? false,
+        inventoryPolicy: dto.inventoryPolicy,
         isActive: dto.isActive ?? true,
         sortOrder: dto.sortOrder ?? 0,
       });
@@ -262,6 +269,15 @@ export class ProductModifierService {
         );
       }
     }
+    const trackInventory = dto.trackInventory ?? option.trackInventory;
+    const inventoryItemId = inventoryTouched
+      ? inventoryData.inventoryItemId
+      : existingInventoryItemId;
+    if (trackInventory && !inventoryItemId) {
+      throw new BadRequestException(
+        'An inventory item is required when trackInventory is enabled',
+      );
+    }
 
     try {
       const updated = await this.productModifierRepository.updateOption(id, {
@@ -273,6 +289,12 @@ export class ProductModifierService {
         }),
         ...(dto.price !== undefined && { price: dto.price }),
         ...(inventoryTouched && inventoryData),
+        ...(dto.trackInventory !== undefined && {
+          trackInventory: dto.trackInventory,
+        }),
+        ...(dto.inventoryPolicy !== undefined && {
+          inventoryPolicy: dto.inventoryPolicy,
+        }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
       });
@@ -637,6 +659,8 @@ export class ProductModifierService {
       price: option.price.toNumber(),
       inventoryItemId: option.inventoryItemId,
       inventoryQuantity: option.inventoryQuantity?.toNumber() ?? null,
+      trackInventory: option.trackInventory,
+      inventoryPolicy: option.inventoryPolicy,
       inventoryItem: option.inventoryItem
         ? {
             id: option.inventoryItem.id,

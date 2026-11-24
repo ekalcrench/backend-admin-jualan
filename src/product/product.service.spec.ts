@@ -1,6 +1,10 @@
 import { jest } from '@jest/globals';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
-import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
+import {
+  InventoryPolicy,
+  OrganizationUserRole,
+  ProductStockManagement,
+} from '../../prisma/generated/prisma/enums.js';
 import type { UserRequestHeader } from '../common/types/user-request-header.types.js';
 import { ProductRepository } from './product.repository.js';
 import { ProductService } from './product.service.js';
@@ -29,6 +33,9 @@ const buildProduct = (
   name,
   sellingPrice: new Prisma.Decimal(20000),
   isActive,
+  stockManagement: ProductStockManagement.UNTRACKED,
+  stock: null,
+  inventoryPolicy: InventoryPolicy.STRICT,
   createdAt,
   updatedAt: createdAt,
   productIngredients: [],
@@ -57,9 +64,7 @@ describe('ProductService isActive integration', () => {
   beforeEach(() => {
     repository = createRepository();
     repository.findRemainingStockByInventoryItemIds.mockResolvedValue([]);
-    service = new ProductService(
-      repository as unknown as ProductRepository,
-    );
+    service = new ProductService(repository as unknown as ProductRepository);
   });
 
   it('defaults new products to active', async () => {
@@ -72,9 +77,7 @@ describe('ProductService isActive integration', () => {
       {
         name: 'Soto Padang Ayam',
         sellingPrice: 20000,
-        productIngredients: [
-          { inventoryItemId, quantity: 100 },
-        ],
+        productIngredients: [{ inventoryItemId, quantity: 100 }],
       },
       user,
     );
@@ -85,10 +88,83 @@ describe('ProductService isActive integration', () => {
         name: 'Soto Padang Ayam',
         sellingPrice: 20000,
         isActive: true,
+        stockManagement: ProductStockManagement.UNTRACKED,
+        stock: null,
+        inventoryPolicy: undefined,
       },
       [{ inventoryItemId, quantity: 100 }],
     );
     expect(result.isActive).toBe(true);
+    expect(result.stock).toBeNull();
+    expect(result.stockManagement).toBe(ProductStockManagement.UNTRACKED);
+  });
+
+  it('requires an initial stock value for manual stock management', async () => {
+    await expect(
+      service.create(
+        {
+          name: 'Soto Padang Ayam',
+          sellingPrice: 20000,
+          stockManagement: ProductStockManagement.MANUAL,
+        },
+        user,
+      ),
+    ).rejects.toThrow('A non-negative stock value is required');
+
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it('persists and returns user-managed product stock', async () => {
+    repository.create.mockResolvedValue({
+      ...buildProduct(),
+      stockManagement: ProductStockManagement.MANUAL,
+      stock: 5,
+    });
+
+    const result = await service.create(
+      {
+        name: 'Soto Padang Ayam',
+        sellingPrice: 20000,
+        stockManagement: ProductStockManagement.MANUAL,
+        stock: 5,
+      },
+      user,
+    );
+
+    expect(repository.create).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({
+        stockManagement: ProductStockManagement.MANUAL,
+        stock: 5,
+      }),
+      [],
+    );
+    expect(result.stock).toBe(5);
+  });
+
+  it.each([
+    ProductStockManagement.UNTRACKED,
+    ProductStockManagement.INVENTORY,
+  ])('clears manual stock when switching to %s', async (stockManagement) => {
+    repository.findById.mockResolvedValue({
+      ...buildProduct(),
+      stockManagement: ProductStockManagement.MANUAL,
+      stock: 5,
+    });
+    repository.update.mockResolvedValue({
+      ...buildProduct(),
+      stockManagement,
+      stock: null,
+    });
+
+    await service.update(productId, { stockManagement }, user);
+
+    expect(repository.update).toHaveBeenCalledWith(
+      productId,
+      { stockManagement, stock: null },
+      [],
+      undefined,
+    );
   });
 
   it('creates an inactive product when requested', async () => {
@@ -102,9 +178,7 @@ describe('ProductService isActive integration', () => {
         name: 'Soto Padang Ayam',
         sellingPrice: 20000,
         isActive: false,
-        productIngredients: [
-          { inventoryItemId, quantity: 100 },
-        ],
+        productIngredients: [{ inventoryItemId, quantity: 100 }],
       },
       user,
     );
@@ -121,11 +195,7 @@ describe('ProductService isActive integration', () => {
     repository.findById.mockResolvedValue(buildProduct(true));
     repository.update.mockResolvedValue(buildProduct(false));
 
-    const result = await service.update(
-      productId,
-      { isActive: false },
-      user,
-    );
+    const result = await service.update(productId, { isActive: false }, user);
 
     expect(repository.update).toHaveBeenCalledWith(
       productId,

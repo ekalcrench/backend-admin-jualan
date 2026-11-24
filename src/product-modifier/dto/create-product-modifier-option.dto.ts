@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -12,6 +13,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { InventoryPolicy } from '../../../prisma/generated/prisma/enums.js';
 import { trimModifierName } from './create-product-modifier-group.dto.js';
 
 export class CreateProductModifierOptionDto {
@@ -57,6 +59,19 @@ export class CreateProductModifierOptionDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   inventoryQuantity?: number | null;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  trackInventory?: boolean;
+
+  @ApiPropertyOptional({
+    enum: InventoryPolicy,
+    default: InventoryPolicy.STRICT,
+  })
+  @IsOptional()
+  @IsEnum(InventoryPolicy)
+  inventoryPolicy?: InventoryPolicy;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()

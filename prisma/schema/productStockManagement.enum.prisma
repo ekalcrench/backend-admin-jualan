@@ -1,0 +1,7 @@
+enum ProductStockManagement {
+  UNTRACKED
+  MANUAL
+  INVENTORY
+
+  @@map("product_stock_management")
+}

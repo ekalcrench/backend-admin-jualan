@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
+import { ProductStockManagement } from '../../prisma/generated/prisma/enums.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { GetProductOptionsDto } from './dto/get-product-options.dto.js';
@@ -88,13 +89,21 @@ export class ProductService {
       return [];
     }
 
-    const stocks = products.map((product) => ({
-      name: product.name,
-      stock: this.calculateStock(
-        product.productIngredients,
-        remainingStockByInventoryItemId,
-      ),
-    }));
+    const stocks = products
+      .map((product) => ({
+        name: product.name,
+        stock: this.calculateProductStock(
+          product,
+          remainingStockByInventoryItemId,
+        ),
+      }))
+      .filter(
+        (product): product is { name: string; stock: number } =>
+          product.stock !== null,
+      );
+    if (!stocks.length) {
+      return [];
+    }
     const lowestStock = Math.min(...stocks.map(({ stock }) => stock));
 
     return stocks.filter(({ stock }) => stock === lowestStock);
@@ -121,8 +130,11 @@ export class ProductService {
 
   async create(dto: CreateProductDto, userHeader: UserRequestHeader) {
     const organizationId = this.requireOrganizationId(userHeader);
+    const stockManagement =
+      dto.stockManagement ?? ProductStockManagement.UNTRACKED;
+    this.validateStockSettings(stockManagement, dto.stock);
     await this.ensureInventoryItemsBelongToOrganization(
-      dto.productIngredients,
+      dto.productIngredients ?? [],
       organizationId,
     );
 
@@ -133,8 +145,11 @@ export class ProductService {
           name: dto.name,
           sellingPrice: dto.sellingPrice,
           isActive: dto.isActive ?? true,
+          stockManagement,
+          stock: dto.stock ?? null,
+          inventoryPolicy: dto.inventoryPolicy,
         },
-        dto.productIngredients,
+        dto.productIngredients ?? [],
       );
       const remainingStockByInventoryItemId =
         await this.getRemainingStockByInventoryItemIds(
@@ -155,7 +170,14 @@ export class ProductService {
     userHeader: UserRequestHeader,
   ) {
     const organizationId = this.requireOrganizationId(userHeader);
-    await this.ensureExists(id, organizationId);
+    const existingProduct = await this.ensureExists(id, organizationId);
+    const stockManagement =
+      dto.stockManagement ?? existingProduct.stockManagement;
+    this.validateStockSettings(
+      stockManagement,
+      dto.stock !== undefined ? dto.stock : existingProduct.stock,
+      dto.stock !== undefined,
+    );
 
     const ingredientChanges = (dto.productIngredients ?? []).map((ingredient) =>
       this.toProductIngredientChange(ingredient),
@@ -202,6 +224,20 @@ export class ProductService {
         sellingPrice: dto.sellingPrice,
       }),
       ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      ...(dto.stockManagement !== undefined && {
+        stockManagement: dto.stockManagement,
+      }),
+      ...(dto.stock !== undefined && {
+        stock: dto.stock,
+      }),
+      ...(dto.stock === undefined &&
+        dto.stockManagement !== undefined &&
+        stockManagement !== ProductStockManagement.MANUAL && {
+          stock: null,
+        }),
+      ...(dto.inventoryPolicy !== undefined && {
+        inventoryPolicy: dto.inventoryPolicy,
+      }),
     };
 
     try {
@@ -259,6 +295,27 @@ export class ProductService {
     const product = await this.productRepository.findById(id, organizationId);
     if (!product) {
       throw new NotFoundException('Product not found');
+    }
+    return product;
+  }
+
+  private validateStockSettings(
+    stockManagement: ProductStockManagement,
+    stock: number | null | undefined,
+    stockWasProvided = stock !== undefined,
+  ) {
+    if (
+      stockManagement === ProductStockManagement.MANUAL &&
+      (stock === null || stock === undefined)
+    ) {
+      throw new BadRequestException(
+        'A non-negative stock value is required for MANUAL stock management',
+      );
+    }
+    if (stockWasProvided && stockManagement !== ProductStockManagement.MANUAL) {
+      throw new BadRequestException(
+        'stock can only be set when stockManagement is MANUAL',
+      );
     }
   }
 
@@ -328,8 +385,10 @@ export class ProductService {
       name: product.name,
       sellingPrice: product.sellingPrice.toNumber(),
       isActive: product.isActive,
-      stock: this.calculateStock(
-        product.productIngredients,
+      stockManagement: product.stockManagement,
+      inventoryPolicy: product.inventoryPolicy,
+      stock: this.calculateProductStock(
+        product,
         remainingStockByInventoryItemId,
       ),
     };
@@ -347,8 +406,10 @@ export class ProductService {
       name: product.name,
       sellingPrice: product.sellingPrice.toNumber(),
       isActive: product.isActive,
-      stock: this.calculateStock(
-        product.productIngredients,
+      stockManagement: product.stockManagement,
+      inventoryPolicy: product.inventoryPolicy,
+      stock: this.calculateProductStock(
+        product,
         remainingStockByInventoryItemId,
       ),
       productIngredients: product.productIngredients.map((ingredient) => ({
@@ -382,11 +443,32 @@ export class ProductService {
     );
   }
 
-  private calculateStock(
-    ingredients: Array<{
-      inventoryItemId: string;
-      quantity: Prisma.Decimal;
-    }>,
+  private calculateProductStock(
+    product: {
+      stockManagement: ProductStockManagement;
+      stock: number | null;
+      productIngredients: Array<{
+        inventoryItemId: string;
+        quantity: Prisma.Decimal;
+      }>;
+    },
+    remainingStockByInventoryItemId: Map<string, Prisma.Decimal>,
+  ): number | null {
+    if (product.stockManagement === ProductStockManagement.UNTRACKED) {
+      return null;
+    }
+    if (product.stockManagement === ProductStockManagement.MANUAL) {
+      return product.stock;
+    }
+
+    return this.calculateInventoryStock(
+      product.productIngredients,
+      remainingStockByInventoryItemId,
+    );
+  }
+
+  private calculateInventoryStock(
+    ingredients: Array<{ inventoryItemId: string; quantity: Prisma.Decimal }>,
     remainingStockByInventoryItemId: Map<string, Prisma.Decimal>,
   ) {
     if (!ingredients.length) {

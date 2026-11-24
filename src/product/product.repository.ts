@@ -45,6 +45,9 @@ export class ProductRepository {
         name: true,
         sellingPrice: true,
         isActive: true,
+        stockManagement: true,
+        stock: true,
+        inventoryPolicy: true,
         productIngredients: {
           select: {
             inventoryItemId: true,
@@ -93,7 +96,12 @@ export class ProductRepository {
     organizationId: string,
     data: Pick<
       Prisma.ProductCreateInput,
-      'name' | 'sellingPrice' | 'isActive'
+      | 'name'
+      | 'sellingPrice'
+      | 'isActive'
+      | 'stockManagement'
+      | 'stock'
+      | 'inventoryPolicy'
     >,
     productIngredients: Array<{ inventoryItemId: string; quantity: number }>,
   ) {

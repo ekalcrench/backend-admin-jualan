@@ -1,0 +1,6 @@
+enum CostingStatus {
+  UNKNOWN
+  CALCULATED
+
+  @@map("costing_status")
+}

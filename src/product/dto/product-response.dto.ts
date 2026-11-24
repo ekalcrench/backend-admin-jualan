@@ -1,6 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseResponseDto } from '../../common/dto/base-response.dto.js';
-import { InventoryUnit } from '../../../prisma/generated/prisma/enums.js';
+import {
+  InventoryPolicy,
+  InventoryUnit,
+  ProductStockManagement,
+} from '../../../prisma/generated/prisma/enums.js';
 
 export class ProductIngredientResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -52,11 +56,21 @@ export class ProductResponseDto extends BaseResponseDto {
   isActive!: boolean;
 
   @ApiProperty({
-    example: 7,
-    minimum: 0,
-    description: 'Maximum whole products that can be made with current stock',
+    enum: ProductStockManagement,
+    example: ProductStockManagement.UNTRACKED,
   })
-  stock!: number;
+  stockManagement!: ProductStockManagement;
+
+  @ApiProperty({ enum: InventoryPolicy, example: InventoryPolicy.STRICT })
+  inventoryPolicy!: InventoryPolicy;
+
+  @ApiProperty({
+    example: 7,
+    nullable: true,
+    description:
+      'Manual stock, inventory-derived stock, or null when stock is untracked',
+  })
+  stock!: number | null;
 
   @ApiProperty({ type: [ProductIngredientResponseDto] })
   productIngredients!: ProductIngredientResponseDto[];

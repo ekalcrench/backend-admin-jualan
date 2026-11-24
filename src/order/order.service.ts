@@ -5,14 +5,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus, Prisma } from '../../prisma/generated/prisma/client.js';
+import {
+  CostingStatus,
+  OrderStatus,
+  Prisma,
+} from '../../prisma/generated/prisma/client.js';
 import { OrderType } from '../../prisma/generated/prisma/enums.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto.js';
 import { UpdateOrderDto } from './dto/update-order.dto.js';
 import {
+  InsufficientManualProductStockError,
   InsufficientOrderInventoryError,
+  InvalidManualProductStockError,
   OrderInventoryReferenceError,
   OrderRepository,
 } from './order.repository.js';
@@ -59,7 +65,10 @@ export class OrderService {
       return {
         totalAmount: totalAmount.toNumber(),
         totalQuantity: totals._sum.totalQuantity ?? 0,
-        totalGrossProfit: totalAmount.minus(totalUnitCost).toNumber(),
+        totalGrossProfit:
+          totalUnitCost === null
+            ? null
+            : totalAmount.minus(totalUnitCost).toNumber(),
         prevTotalAmount: 0,
         prevTotalQuantity: 0,
         prevTotalGrossProfit: 0,
@@ -80,12 +89,16 @@ export class OrderService {
     return {
       totalAmount: totalAmount.toNumber(),
       totalQuantity: totals._sum.totalQuantity ?? 0,
-      totalGrossProfit: totalAmount.minus(totalUnitCost).toNumber(),
+      totalGrossProfit:
+        totalUnitCost === null
+          ? null
+          : totalAmount.minus(totalUnitCost).toNumber(),
       prevTotalAmount: previousAmount.toNumber(),
       prevTotalQuantity: previousOverviews._sum.totalQuantity ?? 0,
-      prevTotalGrossProfit: previousAmount
-        .minus(previousTotalUnitCost)
-        .toNumber(),
+      prevTotalGrossProfit:
+        previousTotalUnitCost === null
+          ? null
+          : previousAmount.minus(previousTotalUnitCost).toNumber(),
     };
   }
 
@@ -342,10 +355,16 @@ export class OrderService {
   }
 
   async delete(id: string, userHeader: UserRequestHeader) {
-    const result = await this.orderRepository.delete(
-      id,
-      this.requireOrganizationId(userHeader),
-    );
+    let result: Awaited<ReturnType<OrderRepository['delete']>>;
+    try {
+      result = await this.orderRepository.delete(
+        id,
+        this.requireOrganizationId(userHeader),
+      );
+    } catch (error) {
+      this.throwIfInsufficientInventory(error);
+      throw error;
+    }
     if (result === 'not-found') {
       throw new NotFoundException('Order not found');
     }
@@ -489,7 +508,11 @@ export class OrderService {
           id: item.id,
           quantity: item.quantity,
           unitPrice: item.unitPrice.toNumber(),
-          unitCost: item.unitCost.toNumber(),
+          unitCost:
+            item.costingStatus === CostingStatus.UNKNOWN
+              ? null
+              : item.unitCost.toNumber(),
+          costingStatus: item.costingStatus,
           modifierTotal: modifierTotal.toNumber(),
           unitTotal: unitTotal.toNumber(),
           subtotal: subtotal.toNumber(),
@@ -608,9 +631,13 @@ export class OrderService {
   private throwIfInsufficientInventory(error: unknown): void {
     if (
       error instanceof InsufficientOrderInventoryError ||
-      error instanceof OrderInventoryReferenceError
+      error instanceof OrderInventoryReferenceError ||
+      error instanceof InsufficientManualProductStockError
     ) {
       throw new ConflictException(error.message);
+    }
+    if (error instanceof InvalidManualProductStockError) {
+      throw new BadRequestException(error.message);
     }
   }
 

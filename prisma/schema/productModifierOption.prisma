@@ -10,6 +10,9 @@ model ProductModifierOption {
   // Inventory quantity consumed for one selected option, in the inventory item base unit.
   inventoryQuantity Decimal? @map("inventory_quantity") @db.Decimal(15, 2)
 
+  trackInventory  Boolean         @default(false) @map("track_inventory")
+  inventoryPolicy InventoryPolicy @default(STRICT) @map("inventory_policy")
+
   isActive  Boolean @default(true) @map("is_active")
   sortOrder Int     @default(0) @map("sort_order")
 

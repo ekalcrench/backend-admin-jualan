@@ -1,0 +1,6 @@
+enum InventoryPolicy {
+  STRICT
+  ALLOW_NEGATIVE
+
+  @@map("inventory_policy")
+}

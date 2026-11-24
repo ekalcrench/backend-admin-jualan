@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { OrderItemModifierResponseDto } from './order-item-modifier-response.dto.js';
+import { CostingStatus } from '../../../prisma/generated/prisma/enums.js';
 
 export class OrderItemResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -14,8 +15,11 @@ export class OrderItemResponseDto {
   })
   unitPrice!: number;
 
-  @ApiProperty({ minimum: 0 })
-  unitCost!: number;
+  @ApiProperty({ minimum: 0, nullable: true })
+  unitCost!: number | null;
+
+  @ApiProperty({ enum: CostingStatus, example: CostingStatus.CALCULATED })
+  costingStatus!: CostingStatus;
 
   @ApiProperty({
     minimum: 0,

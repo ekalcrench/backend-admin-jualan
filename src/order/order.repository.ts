@@ -2,9 +2,12 @@
 import { Injectable } from '@nestjs/common';
 import {
   CashTransactionType,
+  CostingStatus,
+  InventoryPolicy,
   InventoryTransactionType,
   OrderStatus,
   OrderType,
+  ProductStockManagement,
   Prisma,
 } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -29,6 +32,20 @@ export class InsufficientOrderInventoryError extends Error {
   }
 }
 
+export class InsufficientManualProductStockError extends Error {
+  constructor(productName: string) {
+    super(`Stok untuk produk "${productName}" tidak mencukupi`);
+    this.name = 'InsufficientManualProductStockError';
+  }
+}
+
+export class InvalidManualProductStockError extends Error {
+  constructor(productName: string) {
+    super(`Stok manual untuk produk "${productName}" belum dikonfigurasi`);
+    this.name = 'InvalidManualProductStockError';
+  }
+}
+
 /**
  * Raised when an order (or one of its modifier snapshots) references an
  * inventory item that no longer exists in the organization. Deducting another
@@ -41,6 +58,40 @@ export class OrderInventoryReferenceError extends Error {
     this.name = 'OrderInventoryReferenceError';
   }
 }
+
+type InventoryLineInput = {
+  quantity: number;
+  productTrackInventory: boolean;
+  productInventoryPolicy: InventoryPolicy;
+  productIngredients: Array<{
+    inventoryItemId: string;
+    quantity: Prisma.Decimal;
+  }>;
+  modifiers: Array<{
+    inventoryItemId: string | null;
+    inventoryQuantity: Prisma.Decimal | null;
+    trackInventory: boolean;
+    inventoryPolicy: InventoryPolicy;
+  }>;
+};
+
+type PlannedInventoryConsumption = {
+  inventoryItemId: string;
+  inventoryLotId: string | null;
+  quantity: Prisma.Decimal;
+  unitCost: Prisma.Decimal;
+};
+
+type PreparedInventoryPlan = {
+  costs: Array<{ unitCost: Prisma.Decimal; costingStatus: CostingStatus }>;
+  lotUpdates: Array<{
+    id: string;
+    initialQuantity: Prisma.Decimal;
+    remainingQuantity: Prisma.Decimal;
+    inventoryItemId: string;
+  }>;
+  consumptions: PlannedInventoryConsumption[];
+};
 
 @Injectable()
 export class OrderRepository {
@@ -136,11 +187,16 @@ export class OrderRepository {
     ]);
   }
 
-  private async getTotalUnitCost(where: Prisma.OrderWhereInput) {
+  private async getTotalUnitCost(
+    where: Prisma.OrderWhereInput,
+  ): Promise<Prisma.Decimal | null> {
     const items = await this.prisma.orderItem.findMany({
       where: { order: { is: { ...where, status: OrderStatus.PAID } } },
-      select: { quantity: true, unitCost: true },
+      select: { quantity: true, unitCost: true, costingStatus: true },
     });
+    if (items.some((item) => item.costingStatus === CostingStatus.UNKNOWN)) {
+      return null;
+    }
 
     return items.reduce(
       (total, item) => total.plus(item.unitCost.mul(item.quantity)),
@@ -215,36 +271,71 @@ export class OrderRepository {
   }
 
   async markPaid(id: string, organizationId: string) {
-    const result = await this.prisma.$transaction(async (transaction) => {
-      const result = await transaction.order.updateMany({
-        where: { id, organizationId, status: OrderStatus.UNPAID },
-        data: { status: OrderStatus.PAID },
-      });
-
-      if (result.count === 1) {
-        await this.applyOrderInventory(transaction, organizationId, id);
-        const order = await transaction.order.findFirstOrThrow({
+    const result = await this.prisma.$transaction(
+      async (transaction) => {
+        const orderBeforePayment = await transaction.order.findFirst({
           where: { id, organizationId },
-          include: responseInclude,
+          select: { id: true, status: true, inventoryDeducted: true },
         });
-        await transaction.cashTransaction.create({
-          data: {
-            organizationId,
-            type: CashTransactionType.SALE,
-            amount: order.totalAmount,
-            description: `Sale from order ${order.orderNumber}`,
-            referenceId: order.id,
-          },
+        if (!orderBeforePayment) {
+          return 'not-found' as const;
+        }
+        if (orderBeforePayment.status === OrderStatus.PAID) {
+          return 'already-paid' as const;
+        }
+        const orderItemsBeforePayment = await transaction.orderItem.findMany({
+          where: { orderId: id },
+          select: { productId: true },
         });
-        return order;
-      }
+        await this.lockProducts(
+          transaction,
+          organizationId,
+          orderItemsBeforePayment.map((item) => item.productId),
+        );
 
-      const order = await transaction.order.findFirst({
-        where: { id, organizationId },
-        select: { id: true },
-      });
-      return order ? ('already-paid' as const) : ('not-found' as const);
-    });
+        const result = await transaction.order.updateMany({
+          where: { id, organizationId, status: OrderStatus.UNPAID },
+          data: { status: OrderStatus.PAID },
+        });
+
+        if (result.count === 1) {
+          if (!orderBeforePayment.inventoryDeducted) {
+            await this.applyOrderInventory(
+              transaction,
+              organizationId,
+              id,
+              false,
+            );
+            await this.applyOrderManualStock(transaction, organizationId, id);
+            await transaction.order.update({
+              where: { id },
+              data: { inventoryDeducted: true },
+            });
+          }
+          const order = await transaction.order.findFirstOrThrow({
+            where: { id, organizationId },
+            include: responseInclude,
+          });
+          await transaction.cashTransaction.create({
+            data: {
+              organizationId,
+              type: CashTransactionType.SALE,
+              amount: order.totalAmount,
+              description: `Sale from order ${order.orderNumber}`,
+              referenceId: order.id,
+            },
+          });
+          return order;
+        }
+
+        const order = await transaction.order.findFirst({
+          where: { id, organizationId },
+          select: { id: true },
+        });
+        return order ? ('already-paid' as const) : ('not-found' as const);
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     if (typeof result === 'string') {
       return result;
     }
@@ -282,6 +373,11 @@ export class OrderRepository {
     return this.prisma
       .$transaction(
         async (transaction) => {
+          await this.lockProducts(
+            transaction,
+            organizationId,
+            orderItems.map((item) => item.productId),
+          );
           const resolvedItems =
             await this.productModifierOrdering.resolveOrderItems(
               transaction,
@@ -291,11 +387,16 @@ export class OrderRepository {
                 modifierOptionIds: item.modifierOptionIds ?? [],
               })),
             );
-          const unitCostByProductId = await this.getProductUnitCosts(
+          const inventoryPlan = await this.prepareOrderInventoryAndCosts(
             transaction,
-            resolvedItems.map((item) => ({
-              id: item.productId,
-              productIngredients: item.productIngredients,
+            organizationId,
+            resolvedItems.map((resolved, index) => ({
+              quantity: orderItems[index].quantity,
+              productTrackInventory:
+                resolved.stockManagement === ProductStockManagement.INVENTORY,
+              productInventoryPolicy: resolved.inventoryPolicy,
+              productIngredients: resolved.productIngredients,
+              modifiers: resolved.modifierSnapshots ?? [],
             })),
           );
 
@@ -305,13 +406,7 @@ export class OrderRepository {
 
           for (const [index, resolved] of resolvedItems.entries()) {
             const quantity = orderItems[index].quantity;
-            const unitCost = unitCostByProductId.get(resolved.productId);
-            if (unitCost === undefined) {
-              throw new OrderModifierValidationError(
-                'product-not-found',
-                'One or more products were not found in this organization',
-              );
-            }
+            const { unitCost, costingStatus } = inventoryPlan.costs[index];
 
             const modifierSnapshots = resolved.modifierSnapshots ?? [];
             items.push({
@@ -319,6 +414,9 @@ export class OrderRepository {
               quantity,
               unitPrice: resolved.sellingPrice,
               unitCost,
+              costingStatus,
+              manualStockDeducted:
+                resolved.stockManagement === ProductStockManagement.MANUAL,
               ...(modifierSnapshots.length && {
                 modifiers: { create: modifierSnapshots },
               }),
@@ -347,6 +445,7 @@ export class OrderRepository {
               totalAmount,
               totalQuantity,
               status: OrderStatus.UNPAID,
+              inventoryDeducted: true,
               organization: { connect: { id: organizationId } },
               cashier: { connect: { id: cashierId } },
               ...(customerId && {
@@ -356,6 +455,17 @@ export class OrderRepository {
             },
             include: responseInclude,
           });
+          await this.commitOrderInventory(
+            transaction,
+            organizationId,
+            order.id,
+            inventoryPlan,
+          );
+          await this.applyOrderManualStock(
+            transaction,
+            organizationId,
+            order.id,
+          );
           return order;
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -380,7 +490,13 @@ export class OrderRepository {
         async (transaction) => {
           const order = await transaction.order.findFirst({
             where: { id, organizationId },
-            select: { id: true, status: true, type: true, referenceId: true },
+            select: {
+              id: true,
+              status: true,
+              type: true,
+              referenceId: true,
+              inventoryDeducted: true,
+            },
           });
           if (!order) {
             return 'not-found' as const;
@@ -388,6 +504,33 @@ export class OrderRepository {
           if (order.status === OrderStatus.PAID) {
             return 'paid' as const;
           }
+
+          const itemsBeforeUpdate = await transaction.orderItem.findMany({
+            where: { orderId: id },
+            select: {
+              id: true,
+              productId: true,
+              quantity: true,
+              manualStockDeducted: true,
+            },
+          });
+          const existingProductIdByItemId = new Map(
+            itemsBeforeUpdate.map((item) => [item.id, item.productId]),
+          );
+          await this.lockProducts(transaction, organizationId, [
+            ...itemsBeforeUpdate.map((item) => item.productId),
+            ...itemChanges
+              .map(
+                (item) =>
+                  item.productId ??
+                  (item.id
+                    ? existingProductIdByItemId.get(item.id)
+                    : undefined),
+              )
+              .filter(
+                (productId): productId is string => productId !== undefined,
+              ),
+          ]);
 
           const updateChanges = itemChanges.filter(
             (item): item is OrderItemChange & { id: string } =>
@@ -493,11 +636,13 @@ export class OrderRepository {
                 };
               }),
             );
-          const unitCostByProductId = await this.getProductUnitCosts(
+          const unitCosts = await this.getProductUnitCosts(
             transaction,
-            resolvedItems.map((item) => ({
-              id: item.productId,
-              productIngredients: item.productIngredients,
+            organizationId,
+            resolvedItems.map((resolved, index) => ({
+              quantity: changeMeta.get(itemChanges[index])!.quantity,
+              productIngredients: resolved.productIngredients,
+              modifiers: resolved.modifierSnapshots ?? [],
             })),
           );
 
@@ -506,23 +651,19 @@ export class OrderRepository {
             quantity: number;
             resolved: ResolvedOrderModifierItem;
             unitCost: Prisma.Decimal;
+            costingStatus: CostingStatus;
           }> = [];
           for (const [index, item] of itemChanges.entries()) {
             const meta = changeMeta.get(item)!;
             const resolved = resolvedItems[index];
-            const unitCost = unitCostByProductId.get(resolved.productId);
-            if (unitCost === undefined) {
-              throw new OrderModifierValidationError(
-                'product-not-found',
-                'One or more products were not found in this organization',
-              );
-            }
+            const { unitCost, costingStatus } = unitCosts[index];
 
             pricedChanges.push({
               item,
               quantity: meta.quantity,
               resolved,
               unitCost,
+              costingStatus,
             });
           }
 
@@ -607,7 +748,13 @@ export class OrderRepository {
             });
           }
 
-          for (const { item, quantity, resolved, unitCost } of pricedChanges) {
+          for (const {
+            item,
+            quantity,
+            resolved,
+            unitCost,
+            costingStatus,
+          } of pricedChanges) {
             const modifierSnapshots = resolved.modifierSnapshots;
 
             if (item.id) {
@@ -619,6 +766,7 @@ export class OrderRepository {
                   quantity,
                   unitPrice: resolved.sellingPrice,
                   unitCost,
+                  costingStatus,
                 },
               });
 
@@ -643,6 +791,7 @@ export class OrderRepository {
                   quantity,
                   unitPrice: resolved.sellingPrice,
                   unitCost,
+                  costingStatus,
                   order: { connect: { id } },
                   ...(modifierSnapshots?.length && {
                     modifiers: { create: modifierSnapshots },
@@ -667,6 +816,23 @@ export class OrderRepository {
             where: { id },
             data: { totalAmount, totalQuantity },
           });
+
+          if (itemChanges.length || deletedOrderItemIds.length) {
+            await this.restoreOrderManualStock(
+              transaction,
+              organizationId,
+              itemsBeforeUpdate,
+            );
+            if (order.inventoryDeducted) {
+              await this.restoreOrderInventory(transaction, organizationId, id);
+            }
+            await this.applyOrderInventory(transaction, organizationId, id);
+            await this.applyOrderManualStock(transaction, organizationId, id);
+            await transaction.order.update({
+              where: { id },
+              data: { inventoryDeducted: true },
+            });
+          }
 
           return transaction.order.findFirstOrThrow({
             where: { id, organizationId },
@@ -701,6 +867,20 @@ export class OrderRepository {
           return 'paid' as const;
         }
 
+        const orderItems = await transaction.orderItem.findMany({
+          where: { orderId: id },
+          select: {
+            productId: true,
+            quantity: true,
+            manualStockDeducted: true,
+          },
+        });
+        await this.lockProducts(
+          transaction,
+          organizationId,
+          orderItems.map((item) => item.productId),
+        );
+
         const orderUpdate = await transaction.order.updateMany({
           where: { id, organizationId, status: OrderStatus.UNPAID },
           data: { status: OrderStatus.UNPAID },
@@ -712,6 +892,19 @@ export class OrderRepository {
           });
           return currentOrder ? ('paid' as const) : ('not-found' as const);
         }
+
+        const orderInventory = await transaction.order.findFirstOrThrow({
+          where: { id, organizationId },
+          select: { inventoryDeducted: true },
+        });
+        if (orderInventory.inventoryDeducted) {
+          await this.restoreOrderInventory(transaction, organizationId, id);
+        }
+        await this.restoreOrderManualStock(
+          transaction,
+          organizationId,
+          orderItems,
+        );
 
         await transaction.orderItem.deleteMany({
           where: { orderId: id },
@@ -1040,183 +1233,51 @@ export class OrderRepository {
 
   private async getProductUnitCosts(
     transaction: Prisma.TransactionClient,
+    organizationId: string,
     products: Array<{
-      id: string;
+      quantity: number;
       productIngredients: Array<{
         inventoryItemId: string;
         quantity: Prisma.Decimal;
+      }>;
+      modifiers: Array<{
+        inventoryItemId: string | null;
+        inventoryQuantity: Prisma.Decimal | null;
       }>;
     }>,
   ) {
     const inventoryItemIds = [
       ...new Set(
-        products.flatMap((product) =>
-          product.productIngredients.map(
+        products.flatMap((product) => [
+          ...product.productIngredients.map(
             (ingredient) => ingredient.inventoryItemId,
           ),
-        ),
+          ...product.modifiers.flatMap((modifier) =>
+            modifier.inventoryItemId ? [modifier.inventoryItemId] : [],
+          ),
+        ]),
       ),
     ];
-    const lots = inventoryItemIds.length
-      ? await transaction.inventoryLot.findMany({
-          where: {
-            inventoryItemId: { in: inventoryItemIds },
-            remainingQuantity: { gt: 0 },
-          },
-          orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
-          select: {
-            inventoryItemId: true,
-            remainingQuantity: true,
-            unitCost: true,
-          },
-        })
-      : [];
-
-    const lotsByInventoryItemId = new Map<
-      string,
-      Array<{ remainingQuantity: Prisma.Decimal; unitCost: Prisma.Decimal }>
-    >();
-    for (const lot of lots) {
-      const itemLots = lotsByInventoryItemId.get(lot.inventoryItemId) ?? [];
-      itemLots.push(lot);
-      lotsByInventoryItemId.set(lot.inventoryItemId, itemLots);
-    }
-
-    const unitCostByProductId = new Map<string, Prisma.Decimal>();
-    for (const product of products) {
-      let productUnitCost = new Prisma.Decimal(0);
-      for (const ingredient of product.productIngredients) {
-        let quantityNeeded = ingredient.quantity;
-        let ingredientCost = new Prisma.Decimal(0);
-        let quantityCosted = new Prisma.Decimal(0);
-
-        for (const lot of lotsByInventoryItemId.get(
-          ingredient.inventoryItemId,
-        ) ?? []) {
-          if (quantityNeeded.lessThanOrEqualTo(0)) {
-            break;
-          }
-          const consumed = lot.remainingQuantity.lessThan(quantityNeeded)
-            ? lot.remainingQuantity
-            : quantityNeeded;
-          ingredientCost = ingredientCost.plus(lot.unitCost.mul(consumed));
-          quantityCosted = quantityCosted.plus(consumed);
-          quantityNeeded = quantityNeeded.minus(consumed);
-        }
-
-        if (quantityCosted.greaterThan(0)) {
-          productUnitCost = productUnitCost.plus(
-            roundCost(
-              ingredientCost.div(quantityCosted).mul(ingredient.quantity),
-              3,
-            ),
-          );
-        }
-      }
-      unitCostByProductId.set(product.id, roundCost(productUnitCost, 3));
-    }
-
-    return unitCostByProductId;
-  }
-
-  private async applyOrderInventory(
-    transaction: Prisma.TransactionClient,
-    organizationId: string,
-    orderId: string,
-  ) {
-    const items = await transaction.orderItem.findMany({
-      where: { orderId },
-      select: {
-        quantity: true,
-        product: {
-          select: {
-            productIngredients: {
-              select: {
-                inventoryItemId: true,
-                quantity: true,
-              },
-            },
-          },
-        },
-        modifiers: {
-          select: {
-            inventoryItemId: true,
-            inventoryQuantity: true,
-          },
-        },
-      },
-    });
-
-    // Aggregate both recipe ingredients and modifier inventory snapshots by
-    // inventory item so an item consumed by several modifiers (or by a modifier
-    // and the recipe) is allocated exactly once through the same FIFO walk.
-    const requiredQuantityByInventoryItemId = new Map<
-      string,
-      Prisma.Decimal
-    >();
-    const addRequiredQuantity = (
-      inventoryItemId: string,
-      quantity: Prisma.Decimal,
-    ) => {
-      const current =
-        requiredQuantityByInventoryItemId.get(inventoryItemId) ??
-        new Prisma.Decimal(0);
-      requiredQuantityByInventoryItemId.set(
-        inventoryItemId,
-        current.plus(quantity),
-      );
-    };
-
-    for (const item of items) {
-      for (const ingredient of item.product.productIngredients) {
-        addRequiredQuantity(
-          ingredient.inventoryItemId,
-          ingredient.quantity.mul(item.quantity),
-        );
-      }
-      for (const modifier of item.modifiers) {
-        if (
-          !modifier.inventoryItemId ||
-          !modifier.inventoryQuantity ||
-          modifier.inventoryQuantity.lessThanOrEqualTo(0)
-        ) {
-          continue;
-        }
-        addRequiredQuantity(
-          modifier.inventoryItemId,
-          modifier.inventoryQuantity.mul(item.quantity),
-        );
-      }
-    }
-
-    const inventoryItemIds = [...requiredQuantityByInventoryItemId.keys()];
     if (!inventoryItemIds.length) {
-      return;
+      return products.map(() => ({
+        unitCost: new Prisma.Decimal(0),
+        costingStatus: CostingStatus.UNKNOWN,
+      }));
     }
 
-    // Organization scoping is enforced again here even though modifier master
-    // data is validated when configured. This keeps a stale or tampered
-    // snapshot from consuming another tenant's stock.
     const inventoryItems = await transaction.inventoryItem.findMany({
       where: { organizationId, id: { in: inventoryItemIds } },
-      select: { id: true, name: true },
+      select: { id: true },
     });
-    const inventoryItemNameById = new Map(
-      inventoryItems.map((inventoryItem) => [
-        inventoryItem.id,
-        inventoryItem.name,
-      ]),
-    );
-    if (
-      inventoryItemIds.some(
-        (inventoryItemId) => !inventoryItemNameById.has(inventoryItemId),
-      )
-    ) {
+    if (inventoryItems.length !== inventoryItemIds.length) {
       throw new OrderInventoryReferenceError();
     }
 
     const lots = await transaction.inventoryLot.findMany({
-      where: { inventoryItemId: { in: inventoryItemIds } },
+      where: {
+        inventoryItemId: { in: inventoryItemIds },
+        remainingQuantity: { gt: 0 },
+      },
       orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
@@ -1225,29 +1286,269 @@ export class OrderRepository {
         unitCost: true,
       },
     });
+    const lotsByItem = new Map<
+      string,
+      Array<{
+        id: string;
+        remainingQuantity: Prisma.Decimal;
+        unitCost: Prisma.Decimal;
+      }>
+    >();
+    for (const lot of lots) {
+      const itemLots = lotsByItem.get(lot.inventoryItemId) ?? [];
+      itemLots.push(lot);
+      lotsByItem.set(lot.inventoryItemId, itemLots);
+    }
+
+    const remainingByLotId = new Map(
+      lots.map((lot) => [
+        lot.id,
+        lot.remainingQuantity.greaterThan(0)
+          ? lot.remainingQuantity
+          : new Prisma.Decimal(0),
+      ]),
+    );
+    return products.map((product) => {
+      let totalCost = new Prisma.Decimal(0);
+      const sources = [
+        ...product.productIngredients,
+        ...product.modifiers.flatMap((modifier) =>
+          modifier.inventoryItemId && modifier.inventoryQuantity
+            ? [
+                {
+                  inventoryItemId: modifier.inventoryItemId,
+                  quantity: modifier.inventoryQuantity,
+                },
+              ]
+            : [],
+        ),
+      ];
+      let known = sources.length > 0;
+
+      for (const source of sources) {
+        let quantityNeeded = source.quantity.mul(product.quantity);
+        let sourceCost = new Prisma.Decimal(0);
+        for (const lot of lotsByItem.get(source.inventoryItemId) ?? []) {
+          if (quantityNeeded.lessThanOrEqualTo(0)) {
+            break;
+          }
+          const available = remainingByLotId.get(lot.id)!;
+          if (available.lessThanOrEqualTo(0)) {
+            continue;
+          }
+          const consumed = available.lessThan(quantityNeeded)
+            ? available
+            : quantityNeeded;
+          sourceCost = sourceCost.plus(lot.unitCost.mul(consumed));
+          remainingByLotId.set(lot.id, available.minus(consumed));
+          quantityNeeded = quantityNeeded.minus(consumed);
+        }
+        if (quantityNeeded.greaterThan(0)) {
+          known = false;
+        }
+        totalCost = totalCost.plus(sourceCost);
+      }
+
+      return {
+        unitCost: roundCost(totalCost.div(product.quantity), 3),
+        costingStatus: known ? CostingStatus.CALCULATED : CostingStatus.UNKNOWN,
+      };
+    });
+  }
+
+  private async prepareOrderInventoryAndCosts(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    lines: InventoryLineInput[],
+  ): Promise<PreparedInventoryPlan> {
+    type Source = {
+      inventoryItemId: string;
+      quantity: Prisma.Decimal;
+      trackInventory: boolean;
+      inventoryPolicy: InventoryPolicy;
+    };
+
+    const sourcesByLine = lines.map((line) => {
+      const sources: Source[] = line.productIngredients.map((ingredient) => {
+        if (!ingredient.quantity.greaterThan(0)) {
+          throw new OrderModifierValidationError(
+            'modifier-option-invalid',
+            'Product ingredient quantities must be positive',
+          );
+        }
+        return {
+          inventoryItemId: ingredient.inventoryItemId,
+          quantity: ingredient.quantity,
+          trackInventory: line.productTrackInventory,
+          inventoryPolicy: line.productInventoryPolicy,
+        };
+      });
+
+      for (const modifier of line.modifiers) {
+        if (!modifier.inventoryItemId) {
+          if (modifier.trackInventory || modifier.inventoryQuantity) {
+            throw new OrderModifierValidationError(
+              'modifier-option-invalid',
+              'Modifier inventory item and quantity must be configured together',
+            );
+          }
+          continue;
+        }
+        if (
+          !modifier.inventoryQuantity ||
+          !modifier.inventoryQuantity.greaterThan(0)
+        ) {
+          throw new OrderModifierValidationError(
+            'modifier-option-invalid',
+            'Modifier inventory quantity must be positive when an inventory item is configured',
+          );
+        }
+        sources.push({
+          inventoryItemId: modifier.inventoryItemId,
+          quantity: modifier.inventoryQuantity,
+          trackInventory: modifier.trackInventory,
+          inventoryPolicy: modifier.inventoryPolicy,
+        });
+      }
+
+      return sources;
+    });
+
+    const inventoryItemIds = [
+      ...new Set(
+        sourcesByLine.flatMap((sources) =>
+          sources.map((s) => s.inventoryItemId),
+        ),
+      ),
+    ];
+    if (!inventoryItemIds.length) {
+      return {
+        costs: lines.map(() => ({
+          unitCost: new Prisma.Decimal(0),
+          costingStatus: CostingStatus.UNKNOWN,
+        })),
+        lotUpdates: [],
+        consumptions: [],
+      };
+    }
+
+    await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT id
+      FROM inventory_items
+      WHERE organization_id = CAST(${organizationId} AS uuid)
+        AND id IN (${Prisma.join(inventoryItemIds.map((id) => Prisma.sql`CAST(${id} AS uuid)`))})
+      ORDER BY id
+      FOR UPDATE
+    `);
+    const inventoryItems = await transaction.inventoryItem.findMany({
+      where: { organizationId, id: { in: inventoryItemIds } },
+      select: { id: true, name: true },
+    });
+    if (inventoryItems.length !== inventoryItemIds.length) {
+      throw new OrderInventoryReferenceError();
+    }
+    const itemNameById = new Map(
+      inventoryItems.map((item) => [item.id, item.name]),
+    );
+
+    const lots = await transaction.inventoryLot.findMany({
+      where: { inventoryItemId: { in: inventoryItemIds } },
+      orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        inventoryItemId: true,
+        quantity: true,
+        remainingQuantity: true,
+        unitCost: true,
+        purchaseItemId: true,
+        preparationOutputId: true,
+      },
+    });
+    const lotsByItem = new Map<
+      string,
+      Array<{
+        id: string;
+        inventoryItemId: string;
+        quantity: Prisma.Decimal;
+        remainingQuantity: Prisma.Decimal;
+        unitCost: Prisma.Decimal;
+        purchaseItemId: string | null;
+        preparationOutputId: string | null;
+      }>
+    >();
+    for (const lot of lots) {
+      const itemLots = lotsByItem.get(lot.inventoryItemId) ?? [];
+      itemLots.push(lot);
+      lotsByItem.set(lot.inventoryItemId, itemLots);
+    }
+
     const remainingByLotId = new Map(
       lots.map((lot) => [lot.id, lot.remainingQuantity]),
     );
-    const consumptions: Array<{
-      inventoryItemId: string;
-      inventoryLotId: string;
-      quantity: Prisma.Decimal;
-      unitCost: Prisma.Decimal;
-      totalCost: Prisma.Decimal;
-    }> = [];
-
-    for (const [inventoryItemId, requiredQuantity] of
-      requiredQuantityByInventoryItemId) {
-      if (requiredQuantity.lessThanOrEqualTo(0)) {
-        continue;
+    const strictRequiredByItem = new Map<string, Prisma.Decimal>();
+    for (const [lineIndex, sources] of sourcesByLine.entries()) {
+      for (const source of sources) {
+        if (
+          !source.trackInventory ||
+          source.inventoryPolicy !== InventoryPolicy.STRICT
+        ) {
+          continue;
+        }
+        const quantity = source.quantity.mul(lines[lineIndex].quantity);
+        strictRequiredByItem.set(
+          source.inventoryItemId,
+          (
+            strictRequiredByItem.get(source.inventoryItemId) ??
+            new Prisma.Decimal(0)
+          ).plus(quantity),
+        );
       }
+    }
 
-      let quantityNeeded = requiredQuantity;
-      const itemLots = lots.filter(
-        (lot) => lot.inventoryItemId === inventoryItemId,
+    for (const [inventoryItemId, strictRequired] of strictRequiredByItem) {
+      const available = (lotsByItem.get(inventoryItemId) ?? []).reduce(
+        (sum, lot) => sum.plus(lot.remainingQuantity),
+        new Prisma.Decimal(0),
       );
+      if (available.lessThan(strictRequired)) {
+        throw new InsufficientOrderInventoryError(
+          itemNameById.get(inventoryItemId) ?? inventoryItemId,
+        );
+      }
+    }
 
+    const lineCosts = lines.map(() => new Prisma.Decimal(0));
+    const lineCostsKnown = sourcesByLine.map((sources) => sources.length > 0);
+    const costOnlyRemainingByLotId = new Map(
+      lots.map((lot) => [
+        lot.id,
+        lot.remainingQuantity.greaterThan(0)
+          ? lot.remainingQuantity
+          : new Prisma.Decimal(0),
+      ]),
+    );
+    const consumptions: PlannedInventoryConsumption[] = [];
+
+    const trackedSources = sourcesByLine.flatMap((sources, lineIndex) =>
+      sources
+        .filter((source) => source.trackInventory)
+        .map((source) => ({ source, lineIndex })),
+    );
+    trackedSources.sort(
+      (left, right) =>
+        Number(right.source.inventoryPolicy === InventoryPolicy.STRICT) -
+          Number(left.source.inventoryPolicy === InventoryPolicy.STRICT) ||
+        left.lineIndex - right.lineIndex,
+    );
+
+    for (const { lineIndex, source } of trackedSources) {
+      const itemLots = lotsByItem.get(source.inventoryItemId) ?? [];
+      let quantityNeeded = source.quantity.mul(lines[lineIndex].quantity);
+      let sourceCost = new Prisma.Decimal(0);
       for (const lot of itemLots) {
+        if (quantityNeeded.lessThanOrEqualTo(0)) {
+          break;
+        }
         const available = remainingByLotId.get(lot.id)!;
         if (available.lessThanOrEqualTo(0)) {
           continue;
@@ -1256,58 +1557,455 @@ export class OrderRepository {
           ? available
           : quantityNeeded;
         consumptions.push({
-          inventoryItemId,
+          inventoryItemId: source.inventoryItemId,
           inventoryLotId: lot.id,
           quantity: consumed,
           unitCost: lot.unitCost,
-          totalCost: roundCost(lot.unitCost.mul(consumed), 2),
         });
+        sourceCost = sourceCost.plus(lot.unitCost.mul(consumed));
         remainingByLotId.set(lot.id, available.minus(consumed));
         quantityNeeded = quantityNeeded.minus(consumed);
-        if (quantityNeeded.equals(0)) {
-          break;
+      }
+      if (quantityNeeded.greaterThan(0)) {
+        if (source.inventoryPolicy === InventoryPolicy.STRICT) {
+          throw new InsufficientOrderInventoryError(
+            itemNameById.get(source.inventoryItemId) ?? source.inventoryItemId,
+          );
+        }
+        const fallbackLot = itemLots[0];
+        if (fallbackLot) {
+          if (
+            fallbackLot.quantity.isZero() &&
+            fallbackLot.purchaseItemId === null &&
+            fallbackLot.preparationOutputId === null
+          ) {
+            lineCostsKnown[lineIndex] = false;
+          }
+          remainingByLotId.set(
+            fallbackLot.id,
+            remainingByLotId.get(fallbackLot.id)!.minus(quantityNeeded),
+          );
+          sourceCost = sourceCost.plus(
+            fallbackLot.unitCost.mul(quantityNeeded),
+          );
+          consumptions.push({
+            inventoryItemId: source.inventoryItemId,
+            inventoryLotId: fallbackLot.id,
+            quantity: quantityNeeded,
+            unitCost: fallbackLot.unitCost,
+          });
+        } else {
+          lineCostsKnown[lineIndex] = false;
+          consumptions.push({
+            inventoryItemId: source.inventoryItemId,
+            inventoryLotId: null,
+            quantity: quantityNeeded,
+            unitCost: new Prisma.Decimal(0),
+          });
         }
       }
+      lineCosts[lineIndex] = lineCosts[lineIndex].plus(sourceCost);
+    }
 
-      if (!quantityNeeded.equals(0)) {
-        throw new InsufficientOrderInventoryError(
-          inventoryItemNameById.get(inventoryItemId)!,
+    for (const [lineIndex, sources] of sourcesByLine.entries()) {
+      for (const source of sources) {
+        if (source.trackInventory) {
+          continue;
+        }
+        const itemLots = lotsByItem.get(source.inventoryItemId) ?? [];
+        let quantityNeeded = source.quantity.mul(lines[lineIndex].quantity);
+        let sourceCost = new Prisma.Decimal(0);
+        for (const lot of itemLots) {
+          if (quantityNeeded.lessThanOrEqualTo(0)) {
+            break;
+          }
+          const available = costOnlyRemainingByLotId.get(lot.id)!;
+          if (available.lessThanOrEqualTo(0)) {
+            continue;
+          }
+          const consumed = available.lessThan(quantityNeeded)
+            ? available
+            : quantityNeeded;
+          sourceCost = sourceCost.plus(lot.unitCost.mul(consumed));
+          costOnlyRemainingByLotId.set(lot.id, available.minus(consumed));
+          quantityNeeded = quantityNeeded.minus(consumed);
+        }
+        if (quantityNeeded.greaterThan(0)) {
+          lineCostsKnown[lineIndex] = false;
+        }
+        lineCosts[lineIndex] = lineCosts[lineIndex].plus(sourceCost);
+      }
+    }
+
+    const costs = lines.map((line, index) => ({
+      unitCost: roundCost(lineCosts[index].div(line.quantity), 3),
+      costingStatus: lineCostsKnown[index]
+        ? CostingStatus.CALCULATED
+        : CostingStatus.UNKNOWN,
+    }));
+    const lotUpdates = lots.flatMap((lot) => {
+      const remainingQuantity = remainingByLotId.get(lot.id)!;
+      return remainingQuantity.equals(lot.remainingQuantity)
+        ? []
+        : [
+            {
+              id: lot.id,
+              initialQuantity: lot.remainingQuantity,
+              remainingQuantity,
+              inventoryItemId: lot.inventoryItemId,
+            },
+          ];
+    });
+
+    const groupedConsumptions = new Map<string, PlannedInventoryConsumption>();
+    for (const consumption of consumptions) {
+      const key = `${consumption.inventoryItemId}:${consumption.inventoryLotId ?? 'new-shortage-lot'}`;
+      const current = groupedConsumptions.get(key);
+      if (current) {
+        current.quantity = current.quantity.plus(consumption.quantity);
+      } else {
+        groupedConsumptions.set(key, { ...consumption });
+      }
+    }
+
+    return {
+      costs,
+      lotUpdates,
+      consumptions: [...groupedConsumptions.values()],
+    };
+  }
+
+  private async commitOrderInventory(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    orderId: string,
+    plan: PreparedInventoryPlan,
+  ) {
+    for (const lot of plan.lotUpdates) {
+      const result = await transaction.inventoryLot.updateMany({
+        where: { id: lot.id, remainingQuantity: lot.initialQuantity },
+        data: { remainingQuantity: lot.remainingQuantity },
+      });
+      if (result.count !== 1) {
+        throw new InsufficientOrderInventoryError(lot.inventoryItemId);
+      }
+    }
+
+    const shortageByItem = new Map<string, Prisma.Decimal>();
+    for (const consumption of plan.consumptions) {
+      if (!consumption.inventoryLotId) {
+        shortageByItem.set(
+          consumption.inventoryItemId,
+          (
+            shortageByItem.get(consumption.inventoryItemId) ??
+            new Prisma.Decimal(0)
+          ).plus(consumption.quantity),
         );
       }
     }
 
-    for (const [inventoryLotId, remainingQuantity] of remainingByLotId) {
-      const lot = lots.find((item) => item.id === inventoryLotId)!;
-      const quantityToConsume = lot.remainingQuantity.minus(remainingQuantity);
-      if (quantityToConsume.greaterThan(0)) {
-        const result = await transaction.inventoryLot.updateMany({
-          where: {
-            id: inventoryLotId,
-            remainingQuantity: { gte: quantityToConsume },
-          },
-          data: { remainingQuantity: { decrement: quantityToConsume } },
-        });
-        if (result.count !== 1) {
-          throw new InsufficientOrderInventoryError(
-            inventoryItemNameById.get(lot.inventoryItemId) ??
-              lot.inventoryItemId,
-          );
-        }
-      }
+    const syntheticLotByItem = new Map<string, string>();
+    for (const [inventoryItemId, quantity] of shortageByItem) {
+      const lot = await transaction.inventoryLot.create({
+        data: {
+          inventoryItemId,
+          quantity: new Prisma.Decimal(0),
+          remainingQuantity: quantity.negated(),
+          unitCost: new Prisma.Decimal(0),
+          totalCost: new Prisma.Decimal(0),
+          receivedAt: new Date(),
+        },
+        select: { id: true },
+      });
+      syntheticLotByItem.set(inventoryItemId, lot.id);
     }
 
-    if (consumptions.length) {
+    if (plan.consumptions.length) {
       await transaction.inventoryTransaction.createMany({
-        data: consumptions.map((consumption) => ({
+        data: plan.consumptions.map((consumption) => ({
           organizationId,
           inventoryItemId: consumption.inventoryItemId,
-          inventoryLotId: consumption.inventoryLotId,
+          inventoryLotId:
+            consumption.inventoryLotId ??
+            syntheticLotByItem.get(consumption.inventoryItemId)!,
           type: InventoryTransactionType.SALE,
           quantity: consumption.quantity,
           unitCost: consumption.unitCost,
-          totalCost: consumption.totalCost,
+          totalCost: roundCost(
+            consumption.unitCost.mul(consumption.quantity),
+            2,
+          ),
           referenceId: orderId,
         })),
+      });
+    }
+  }
+
+  private async applyOrderInventory(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    orderId: string,
+    refreshCosts = true,
+  ) {
+    const items = await transaction.orderItem.findMany({
+      where: { orderId },
+      select: {
+        id: true,
+        quantity: true,
+        product: {
+          select: {
+            stockManagement: true,
+            inventoryPolicy: true,
+            productIngredients: {
+              select: { inventoryItemId: true, quantity: true },
+            },
+          },
+        },
+        modifiers: {
+          select: {
+            inventoryItemId: true,
+            inventoryQuantity: true,
+            trackInventory: true,
+            inventoryPolicy: true,
+          },
+        },
+      },
+    });
+    const plan = await this.prepareOrderInventoryAndCosts(
+      transaction,
+      organizationId,
+      items.map((item) => ({
+        quantity: item.quantity,
+        productTrackInventory:
+          item.product.stockManagement === ProductStockManagement.INVENTORY,
+        productInventoryPolicy: item.product.inventoryPolicy,
+        productIngredients: item.product.productIngredients,
+        modifiers: item.modifiers,
+      })),
+    );
+    if (refreshCosts) {
+      for (const [index, item] of items.entries()) {
+        await transaction.orderItem.update({
+          where: { id: item.id },
+          data: {
+            unitCost: plan.costs[index].unitCost,
+            costingStatus: plan.costs[index].costingStatus,
+          },
+        });
+      }
+    }
+    await this.commitOrderInventory(transaction, organizationId, orderId, plan);
+  }
+
+  private async lockProducts(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    ids: string[],
+  ) {
+    const productIds = [...new Set(ids)].sort();
+    if (!productIds.length) {
+      return;
+    }
+
+    await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT id
+      FROM products
+      WHERE organization_id = CAST(${organizationId} AS uuid)
+        AND id IN (${Prisma.join(productIds.map((id) => Prisma.sql`CAST(${id} AS uuid)`))})
+      ORDER BY id
+      FOR UPDATE
+    `);
+  }
+
+  private async applyOrderManualStock(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    orderId: string,
+  ) {
+    const items = await transaction.orderItem.findMany({
+      where: { orderId },
+      select: {
+        id: true,
+        productId: true,
+        quantity: true,
+        manualStockDeducted: true,
+        product: {
+          select: {
+            name: true,
+            stock: true,
+            stockManagement: true,
+          },
+        },
+      },
+    });
+    const demandByProductId = new Map<
+      string,
+      { quantity: number; name: string }
+    >();
+    for (const item of items) {
+      if (item.product.stockManagement !== ProductStockManagement.MANUAL) {
+        continue;
+      }
+      if (item.product.stock === null) {
+        throw new InvalidManualProductStockError(item.product.name);
+      }
+      const current = demandByProductId.get(item.productId);
+      demandByProductId.set(item.productId, {
+        quantity: (current?.quantity ?? 0) + item.quantity,
+        name: item.product.name,
+      });
+    }
+
+    for (const [productId, demand] of [...demandByProductId].sort(
+      ([left], [right]) => left.localeCompare(right),
+    )) {
+      const result = await transaction.product.updateMany({
+        where: {
+          id: productId,
+          organizationId,
+          stockManagement: ProductStockManagement.MANUAL,
+          stock: { gte: demand.quantity },
+        },
+        data: { stock: { decrement: demand.quantity } },
+      });
+      if (result.count !== 1) {
+        throw new InsufficientManualProductStockError(demand.name);
+      }
+    }
+
+    for (const item of items) {
+      const manualStockDeducted =
+        item.product.stockManagement === ProductStockManagement.MANUAL;
+      if (item.manualStockDeducted !== manualStockDeducted) {
+        await transaction.orderItem.update({
+          where: { id: item.id },
+          data: { manualStockDeducted },
+        });
+      }
+    }
+  }
+
+  private async restoreOrderManualStock(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    items: Array<{
+      productId: string;
+      quantity: number;
+      manualStockDeducted: boolean;
+    }>,
+  ) {
+    const quantityByProductId = new Map<string, number>();
+    for (const item of items) {
+      if (item.manualStockDeducted) {
+        quantityByProductId.set(
+          item.productId,
+          (quantityByProductId.get(item.productId) ?? 0) + item.quantity,
+        );
+      }
+    }
+
+    for (const [productId, quantity] of [...quantityByProductId].sort(
+      ([left], [right]) => left.localeCompare(right),
+    )) {
+      const result = await transaction.product.updateMany({
+        where: {
+          id: productId,
+          organizationId,
+          stock: { not: null },
+        },
+        data: { stock: { increment: quantity } },
+      });
+      if (result.count !== 1) {
+        throw new InvalidManualProductStockError(productId);
+      }
+    }
+  }
+
+  private async restoreOrderInventory(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    orderId: string,
+  ) {
+    const transactions = await transaction.inventoryTransaction.findMany({
+      where: {
+        organizationId,
+        referenceId: orderId,
+        type: {
+          in: [InventoryTransactionType.SALE, InventoryTransactionType.RETURN],
+        },
+      },
+      select: {
+        inventoryLotId: true,
+        inventoryItemId: true,
+        quantity: true,
+        unitCost: true,
+        type: true,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    const inventoryItemIds = [
+      ...new Set(transactions.map((record) => record.inventoryItemId)),
+    ].sort();
+    if (inventoryItemIds.length) {
+      await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT id
+        FROM inventory_items
+        WHERE organization_id = CAST(${organizationId} AS uuid)
+          AND id IN (${Prisma.join(inventoryItemIds.map((id) => Prisma.sql`CAST(${id} AS uuid)`))})
+        ORDER BY id
+        FOR UPDATE
+      `);
+      const inventoryItems = await transaction.inventoryItem.findMany({
+        where: { organizationId, id: { in: inventoryItemIds } },
+        select: { id: true },
+      });
+      if (inventoryItems.length !== inventoryItemIds.length) {
+        throw new OrderInventoryReferenceError();
+      }
+    }
+
+    const netByLot = new Map<
+      string,
+      {
+        inventoryItemId: string;
+        quantity: Prisma.Decimal;
+        unitCost: Prisma.Decimal;
+      }
+    >();
+    for (const record of transactions) {
+      const current = netByLot.get(record.inventoryLotId) ?? {
+        inventoryItemId: record.inventoryItemId,
+        quantity: new Prisma.Decimal(0),
+        unitCost: record.unitCost,
+      };
+      const delta =
+        record.type === InventoryTransactionType.SALE
+          ? record.quantity
+          : record.quantity.negated();
+      current.quantity = current.quantity.plus(delta);
+      current.unitCost = record.unitCost;
+      netByLot.set(record.inventoryLotId, current);
+    }
+
+    for (const [inventoryLotId, record] of netByLot) {
+      if (!record.quantity.greaterThan(0)) {
+        continue;
+      }
+      await transaction.inventoryLot.update({
+        where: { id: inventoryLotId },
+        data: { remainingQuantity: { increment: record.quantity } },
+      });
+      await transaction.inventoryTransaction.create({
+        data: {
+          organizationId,
+          inventoryItemId: record.inventoryItemId,
+          inventoryLotId,
+          type: InventoryTransactionType.RETURN,
+          quantity: record.quantity,
+          unitCost: record.unitCost,
+          totalCost: roundCost(record.unitCost.mul(record.quantity), 2),
+          referenceId: orderId,
+        },
       });
     }
   }

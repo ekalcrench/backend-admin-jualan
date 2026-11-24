@@ -4,12 +4,17 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus, Prisma } from '../../prisma/generated/prisma/client.js';
+import {
+  CostingStatus,
+  OrderStatus,
+  Prisma,
+} from '../../prisma/generated/prisma/client.js';
 import { OrderType } from '../../prisma/generated/prisma/enums.js';
 import type { UserRequestHeader } from '../common/types/user-request-header.types.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { UpdateOrderDto } from './dto/update-order.dto.js';
 import {
+  InsufficientManualProductStockError,
   InsufficientOrderInventoryError,
   OrderInventoryReferenceError,
   OrderRepository,
@@ -92,6 +97,7 @@ const buildOrder = (): OrderWithDetails => ({
       quantity: 2,
       unitPrice: new Prisma.Decimal(20000),
       unitCost: new Prisma.Decimal(0),
+      costingStatus: CostingStatus.UNKNOWN,
       product: { id: productId, name: 'Soto Padang Ayam' },
       modifiers: [
         buildModifier(modifierId, 'Ayam Suwir', 2500, 0),
@@ -207,6 +213,8 @@ describe('OrderService modifier integration', () => {
 
     expect(result.orderItems[0]).toMatchObject({
       unitPrice: 20000,
+      unitCost: null,
+      costingStatus: CostingStatus.UNKNOWN,
       modifierTotal: 0,
       unitTotal: 20000,
       subtotal: 40000,
@@ -314,6 +322,19 @@ describe('OrderService modifier integration', () => {
     );
 
     await expect(service.markPaid('order-id', user)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  it('maps insufficient manual product stock during creation to 409', async () => {
+    repository.findProductsByIds.mockResolvedValue([
+      { id: productId, sellingPrice: new Prisma.Decimal(20000) },
+    ]);
+    repository.create.mockRejectedValue(
+      new InsufficientManualProductStockError('Soto Padang Ayam'),
+    );
+
+    await expect(service.create(createDto(), user)).rejects.toBeInstanceOf(
       ConflictException,
     );
   });

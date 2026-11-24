@@ -11,7 +11,10 @@ DROP INDEX "organization_social_medias_organization_id_idx";
 DROP INDEX "organization_social_medias_organization_id_platform_key";
 
 -- DropIndex
-DROP INDEX "organization_social_medias_platform_username_key";
+DROP INDEX IF EXISTS "organization_social_medias_platform_username_key";
+
+-- DropIndex
+DROP INDEX IF EXISTS "organization_social_medias_username_key";
 
 -- CreateIndex
 CREATE UNIQUE INDEX "organization_social_medias_organization_id_platform_usernam_key" ON "organization_social_medias"("organization_id", "platform", "username");

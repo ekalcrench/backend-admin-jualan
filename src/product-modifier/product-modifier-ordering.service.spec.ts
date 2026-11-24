@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
+import { ProductStockManagement } from '../../prisma/generated/prisma/enums.js';
 import { ProductModifierOrderingService } from './product-modifier-ordering.service.js';
 
 const organizationId = '11111111-1111-4111-8111-111111111111';
@@ -62,6 +63,8 @@ const buildProduct = () => ({
   name: 'Soto Padang Ayam',
   sellingPrice: new Prisma.Decimal(20000),
   isActive: true,
+  stockManagement: ProductStockManagement.UNTRACKED,
+  stock: null,
   productIngredients: [],
   modifierGroupMappings: [
     {

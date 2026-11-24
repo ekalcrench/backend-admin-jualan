@@ -14,6 +14,8 @@ type ProductWithOrderingModifiers = Prisma.ProductGetPayload<{
     name: true;
     sellingPrice: true;
     isActive: true;
+    stockManagement: true;
+    inventoryPolicy: true;
     productIngredients: {
       select: {
         inventoryItemId: true;
@@ -38,6 +40,8 @@ type ProductWithOrderingModifiers = Prisma.ProductGetPayload<{
                 price: true;
                 inventoryItemId: true;
                 inventoryQuantity: true;
+                trackInventory: true;
+                inventoryPolicy: true;
               };
             };
           };
@@ -70,6 +74,8 @@ export class ProductModifierOrderingService {
             name: true,
             sellingPrice: true,
             isActive: true,
+            stockManagement: true,
+            inventoryPolicy: true,
             productIngredients: {
               select: {
                 inventoryItemId: true,
@@ -98,6 +104,8 @@ export class ProductModifierOrderingService {
                         price: true,
                         inventoryItemId: true,
                         inventoryQuantity: true,
+                        trackInventory: true,
+                        inventoryPolicy: true,
                       },
                     },
                   },
@@ -146,6 +154,8 @@ export class ProductModifierOrderingService {
       productId: product.id,
       productName: product.name,
       sellingPrice: product.sellingPrice,
+      stockManagement: product.stockManagement,
+      inventoryPolicy: product.inventoryPolicy,
       productIngredients: product.productIngredients,
       modifierSnapshots,
       modifierTotal,
@@ -236,6 +246,12 @@ export class ProductModifierOrderingService {
       }
 
       for (const { option } of selectedOptions) {
+        if (option.trackInventory && !option.inventoryItemId) {
+          throw new OrderModifierValidationError(
+            'modifier-option-invalid',
+            `Modifier option "${option.name}" is configured to track inventory without an inventory item`,
+          );
+        }
         snapshots.push({
           modifierGroupId: group.id,
           modifierOptionId: option.id,
@@ -244,6 +260,8 @@ export class ProductModifierOrderingService {
           unitPrice: option.price,
           inventoryItemId: option.inventoryItemId,
           inventoryQuantity: option.inventoryQuantity,
+          trackInventory: option.trackInventory,
+          inventoryPolicy: option.inventoryPolicy,
           sortOrder: snapshots.length,
         });
       }

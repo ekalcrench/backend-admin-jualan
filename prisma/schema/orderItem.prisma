@@ -3,9 +3,11 @@ model OrderItem {
   orderId   String @map("order_id") @db.Uuid
   productId String @map("product_id") @db.Uuid
 
-  quantity  Int
-  unitPrice Decimal @map("unit_price") @db.Decimal(15, 2)
-  unitCost  Decimal @default(0) @map("unit_cost") @db.Decimal(15, 3)
+  quantity            Int
+  unitPrice           Decimal       @map("unit_price") @db.Decimal(15, 2)
+  unitCost            Decimal       @default(0) @map("unit_cost") @db.Decimal(15, 3)
+  costingStatus       CostingStatus @default(UNKNOWN) @map("costing_status")
+  manualStockDeducted Boolean       @default(false) @map("manual_stock_deducted")
 
   // Relationships
   order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)

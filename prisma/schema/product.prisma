@@ -6,6 +6,10 @@ model Product {
   sellingPrice Decimal @map("selling_price") @db.Decimal(15, 2)
   isActive     Boolean @default(true) @map("is_active")
 
+  stockManagement ProductStockManagement @default(UNTRACKED) @map("stock_management")
+  stock           Int?
+  inventoryPolicy InventoryPolicy        @default(STRICT) @map("inventory_policy")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

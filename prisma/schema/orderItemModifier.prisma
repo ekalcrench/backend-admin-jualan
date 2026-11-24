@@ -13,8 +13,10 @@ model OrderItemModifier {
   // Inventory consumption snapshot taken from the modifier master data at order time.
   // Intentionally a plain value (no foreign key) so historical orders survive inventory
   // item renames, deactivation, or deletion.
-  inventoryItemId   String?  @map("inventory_item_id") @db.Uuid
-  inventoryQuantity Decimal? @map("inventory_quantity") @db.Decimal(15, 2)
+  inventoryItemId   String?         @map("inventory_item_id") @db.Uuid
+  inventoryQuantity Decimal?        @map("inventory_quantity") @db.Decimal(15, 2)
+  trackInventory    Boolean         @default(false) @map("track_inventory")
+  inventoryPolicy   InventoryPolicy @default(STRICT) @map("inventory_policy")
 
   createdAt DateTime @default(now()) @map("created_at")
 

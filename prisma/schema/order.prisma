@@ -5,10 +5,11 @@ model Order {
   cashierId  String? @map("cashier_id") @db.Uuid
   customerId String? @map("customer_id") @db.Uuid
 
-  orderNumber   String      @map("order_number")
-  totalAmount   Decimal     @map("total_amount") @db.Decimal(15, 2)
-  totalQuantity Int         @default(0) @map("total_quantity")
-  status        OrderStatus @default(UNPAID)
+  orderNumber       String      @map("order_number")
+  totalAmount       Decimal     @map("total_amount") @db.Decimal(15, 2)
+  totalQuantity     Int         @default(0) @map("total_quantity")
+  status            OrderStatus @default(UNPAID)
+  inventoryDeducted Boolean     @default(false) @map("inventory_deducted")
 
   type        OrderType @default(DELIVERY)
   referenceId String    @map("reference_id") @db.Uuid

@@ -7,8 +7,8 @@ export class OrderOverviewResponseDto {
   @ApiProperty({ minimum: 0 })
   totalQuantity!: number;
 
-  @ApiProperty()
-  totalGrossProfit!: number;
+  @ApiProperty({ nullable: true })
+  totalGrossProfit!: number | null;
 
   @ApiProperty({ minimum: 0 })
   prevTotalAmount!: number;
@@ -16,6 +16,6 @@ export class OrderOverviewResponseDto {
   @ApiProperty({ minimum: 0 })
   prevTotalQuantity!: number;
 
-  @ApiProperty()
-  prevTotalGrossProfit!: number;
+  @ApiProperty({ nullable: true })
+  prevTotalGrossProfit!: number | null;
 }

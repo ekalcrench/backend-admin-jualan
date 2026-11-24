@@ -1,4 +1,8 @@
 import { Prisma } from '../../../prisma/generated/prisma/client.js';
+import {
+  InventoryPolicy,
+  ProductStockManagement,
+} from '../../../prisma/generated/prisma/enums.js';
 
 export type OrderModifierSelectionInput = {
   productId: string;
@@ -17,6 +21,8 @@ export type OrderItemModifierSnapshotInput = {
   unitPrice: Prisma.Decimal;
   inventoryItemId: string | null;
   inventoryQuantity: Prisma.Decimal | null;
+  trackInventory: boolean;
+  inventoryPolicy: InventoryPolicy;
   sortOrder: number;
 };
 
@@ -24,6 +30,8 @@ export type ResolvedOrderModifierItem = {
   productId: string;
   productName: string;
   sellingPrice: Prisma.Decimal;
+  stockManagement: ProductStockManagement;
+  inventoryPolicy: InventoryPolicy;
   productIngredients: Array<{
     inventoryItemId: string;
     quantity: Prisma.Decimal;
