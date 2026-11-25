@@ -7,4 +7,14 @@ export const organizationUserResponseInclude = {
       email: true,
     },
   },
+  approvedBy: {
+    select: {
+      name: true,
+    },
+  },
+  updatedBy: {
+    select: {
+      name: true,
+    },
+  },
 } satisfies Prisma.OrganizationUserInclude;

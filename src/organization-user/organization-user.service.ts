@@ -11,6 +11,7 @@ import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import { OrganizationUserRepository } from './organization-user.repository.js';
 import { OrganizationUserStatus } from '../../prisma/generated/prisma/enums.js';
 import { OrganizationUserResponseDto } from './dto/organization-user-response.dto.js';
+import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 
 @Injectable()
 export class OrganizationUserService {
@@ -30,7 +31,9 @@ export class OrganizationUserService {
       status: organizationUser.status,
       approvedAt: organizationUser.approvedAt,
       approvedById: organizationUser.approvedById,
+      approvedBy: organizationUser.approvedBy?.name ?? null,
       updatedById: organizationUser.updatedById,
+      updatedBy: organizationUser.updatedBy?.name ?? null,
       createdAt: organizationUser.createdAt,
       updatedAt: organizationUser.updatedAt,
       name: organizationUser.user.name,
@@ -77,7 +80,7 @@ export class OrganizationUserService {
 
   async create(
     dto: CreateOrganizationUserDto,
-    jwtPayload: { organizationId?: string },
+    jwtPayload: UserRequestHeader,
   ) {
     const { organizationId } = jwtPayload;
 
@@ -99,24 +102,32 @@ export class OrganizationUserService {
       status: dto.status,
       user: { connect: { id: dto.userId } },
       organization: { connect: { id: organizationId } },
+      updatedBy: { connect: { id: jwtPayload.sub } },
     });
 
     return this.toResponse(user);
   }
 
-  async update(id: string, dto: UpdateOrganizationUserDto) {
+  async update(
+    id: string,
+    dto: UpdateOrganizationUserDto,
+    userHeader: UserRequestHeader,
+  ) {
     const existingUser = await this.organizationUserRepository.findById(id);
 
     if (!existingUser) {
       throw new NotFoundException('User not found');
     }
 
-    const user = await this.organizationUserRepository.update(id, dto);
+    const user = await this.organizationUserRepository.update(id, {
+      ...dto,
+      updatedBy: { connect: { id: userHeader.sub } },
+    });
 
     return this.toResponse(user);
   }
 
-  async suspend(id: string) {
+  async suspend(id: string, userHeader: UserRequestHeader) {
     const user = await this.organizationUserRepository.findById(id);
 
     if (!user) {
@@ -129,12 +140,13 @@ export class OrganizationUserService {
 
     const updatedUser = await this.organizationUserRepository.update(id, {
       status: OrganizationUserStatus.SUSPENDED,
+      updatedBy: { connect: { id: userHeader.sub } },
     });
 
     return this.toResponse(updatedUser);
   }
 
-  async activate(id: string) {
+  async activate(id: string, userHeader: UserRequestHeader) {
     const user = await this.organizationUserRepository.findById(id);
 
     if (!user) {
@@ -147,12 +159,13 @@ export class OrganizationUserService {
 
     const updatedUser = await this.organizationUserRepository.update(id, {
       status: OrganizationUserStatus.APPROVED,
+      updatedBy: { connect: { id: userHeader.sub } },
     });
 
     return this.toResponse(updatedUser);
   }
 
-  async approve(id: string) {
+  async approve(id: string, userHeader: UserRequestHeader) {
     const user = await this.organizationUserRepository.findById(id);
 
     if (!user) {
@@ -165,6 +178,9 @@ export class OrganizationUserService {
 
     const updatedUser = await this.organizationUserRepository.update(id, {
       status: OrganizationUserStatus.APPROVED,
+      approvedAt: new Date(),
+      approvedBy: { connect: { id: userHeader.sub } },
+      updatedBy: { connect: { id: userHeader.sub } },
     });
 
     return this.toResponse(updatedUser);

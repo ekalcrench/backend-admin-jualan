@@ -33,6 +33,12 @@ export class OrganizationUserResponseDto extends BaseResponseDto {
   @ApiProperty({ format: 'uuid', nullable: true })
   approvedById!: string | null;
 
+  @ApiProperty({ nullable: true })
+  approvedBy!: string | null;
+
   @ApiProperty({ format: 'uuid', nullable: true })
   updatedById!: string | null;
+
+  @ApiProperty({ nullable: true })
+  updatedBy!: string | null;
 }

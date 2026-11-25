@@ -31,6 +31,7 @@ import { GetByPagesDto } from './dto/get-by-pages.dto.js';
 import type { Request } from 'express';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
 import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
 
 @ApiTags('organization-users')
 @Controller('organization-users')
@@ -69,7 +70,7 @@ export class OrganizationUserController {
   @ApiConflictResponse({ description: 'User with this email already exists' })
   create(
     @Body() dto: CreateOrganizationUserDto,
-    @Req() request: Request & { user: { organizationId?: string } },
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.organizationUserService.create(dto, request.user);
   }
@@ -81,8 +82,12 @@ export class OrganizationUserController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiConflictResponse({ description: 'Email already exists' })
-  update(@Param('id') id: string, @Body() dto: UpdateOrganizationUserDto) {
-    return this.organizationUserService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrganizationUserDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.organizationUserService.update(id, dto, request.user);
   }
 
   @Post(':id/suspend')
@@ -92,8 +97,11 @@ export class OrganizationUserController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiNotFoundResponse({ description: 'User not found' })
   @HttpCode(HttpStatus.OK)
-  suspend(@Param('id') id: string) {
-    return this.organizationUserService.suspend(id);
+  suspend(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.organizationUserService.suspend(id, request.user);
   }
 
   @Post(':id/activate')
@@ -103,8 +111,11 @@ export class OrganizationUserController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiNotFoundResponse({ description: 'User not found' })
   @HttpCode(HttpStatus.OK)
-  activate(@Param('id') id: string) {
-    return this.organizationUserService.activate(id);
+  activate(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.organizationUserService.activate(id, request.user);
   }
 
   @Post(':id/approve')
@@ -114,7 +125,10 @@ export class OrganizationUserController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiNotFoundResponse({ description: 'User not found' })
   @HttpCode(HttpStatus.OK)
-  approve(@Param('id') id: string) {
-    return this.organizationUserService.approve(id);
+  approve(
+    @Param('id') id: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.organizationUserService.approve(id, request.user);
   }
 }
