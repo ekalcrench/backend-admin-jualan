@@ -5,7 +5,7 @@ import {
 } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
-import { FindByPagesParams } from './types/find-by-pages-params.types.js';
+import { FindCashFlowByPagesParams } from './types/find-cash-flow-by-pages-params.types.js';
 
 const editableTypes = [
   CashTransactionType.INVESTMENT,
@@ -16,14 +16,23 @@ const editableTypes = [
 export class CashTransactionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, search, startDate, endDate, organizationId } =
-      data;
+  async findByPages(data: FindCashFlowByPagesParams) {
+    const {
+      page,
+      size,
+      sortBy,
+      search,
+      type,
+      startDate,
+      endDate,
+      organizationId,
+    } = data;
     const where: Prisma.CashTransactionWhereInput = {
       organizationId,
       ...(search && {
         description: { contains: search, mode: 'insensitive' },
       }),
+      ...(type && { type }),
     };
 
     if (startDate || endDate) {

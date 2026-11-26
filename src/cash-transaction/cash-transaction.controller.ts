@@ -21,8 +21,8 @@ import {
 } from '@nestjs/swagger';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
-import { CashTransactionGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetCashFlowByPagesResponseDto } from './dto/get-cash-flow-by-pages-response.dto.js';
+import { GetCashFlowByPagesDto } from './dto/get-cash-flow-by-pages.dto.js';
 import { CashTransactionResponseDto } from './dto/cash-transaction-response.dto.js';
 import { CreateCashTransactionDto } from './dto/create-cash-transaction.dto.js';
 import { GetBalanceDto } from './dto/get-balance.dto.js';
@@ -47,10 +47,10 @@ export class CashTransactionController {
     OrganizationUserRole.MEMBER,
   )
   @ApiOperation({ summary: 'Retrieve cash transactions by pages' })
-  @ApiOkResponse({ type: CashTransactionGetByPagesResponseDto })
+  @ApiOkResponse({ type: GetCashFlowByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
-    @Query() query: GetByPagesDto,
+    @Query() query: GetCashFlowByPagesDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.cashTransactionService.findByPages(query, request.user);

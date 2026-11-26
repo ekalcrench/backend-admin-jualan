@@ -10,7 +10,7 @@ import {
 } from '../../prisma/generated/prisma/client.js';
 import { CreateCashTransactionDto } from './dto/create-cash-transaction.dto.js';
 import { GetBalanceDto } from './dto/get-balance.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetCashFlowByPagesDto } from './dto/get-cash-flow-by-pages.dto.js';
 import { UpdateCashTransactionDto } from './dto/update-cash-transaction.dto.js';
 import { CashTransactionRepository } from './cash-transaction.repository.js';
 import { GetCashFlowDto } from './dto/get-cash-flow.dto.js';
@@ -24,7 +24,7 @@ export class CashTransactionService {
     private readonly cashTransactionRepository: CashTransactionRepository,
   ) {}
 
-  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
+  async findByPages(dto: GetCashFlowByPagesDto, userHeader: UserRequestHeader) {
     const { items, total } = await this.cashTransactionRepository.findByPages({
       ...dto,
       organizationId: this.requireOrganizationId(userHeader),

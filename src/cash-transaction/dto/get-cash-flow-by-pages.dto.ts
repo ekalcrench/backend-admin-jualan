@@ -1,9 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { DefaultGetByPagesDto } from '../../common/dto/default-get-by-pages.dto.js';
-import { IsDate, IsOptional } from 'class-validator';
+import { CashTransactionType } from '../../../prisma/generated/prisma/enums.js';
+import { IsDate, IsEnum, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class GetByPagesDto extends DefaultGetByPagesDto {
+export class GetCashFlowByPagesDto extends DefaultGetByPagesDto {
+  @ApiPropertyOptional({ enum: CashTransactionType })
+  @IsEnum(CashTransactionType)
+  @IsOptional()
+  type?: CashTransactionType;
+
   @ApiPropertyOptional({
     type: String,
     format: 'date',
