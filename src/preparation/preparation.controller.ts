@@ -23,8 +23,8 @@ import {
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
 import { CreatePreparationDto } from './dto/create-preparation.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
-import { PreparationGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
+import { GetPreparationByPagesDto } from './dto/get-preparation-by-pages.dto.js';
+import { GetPreparationByPagesResponseDto } from './dto/get-preparation-by-pages-response.dto.js';
 import { PreparationResponseDto } from './dto/preparation-response.dto.js';
 import { UpdatePreparationDto } from './dto/update-preparation.dto.js';
 import { PreparationService } from './preparation.service.js';
@@ -38,9 +38,9 @@ export class PreparationController {
   @Get()
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve preparations by pages' })
-  @ApiOkResponse({ type: PreparationGetByPagesResponseDto })
+  @ApiOkResponse({ type: GetPreparationByPagesResponseDto })
   findByPages(
-    @Query() query: GetByPagesDto,
+    @Query() query: GetPreparationByPagesDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.preparationService.findByPages(query, request.user);

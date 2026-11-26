@@ -21,9 +21,19 @@ export class PreparationRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, search, organizationId } = data;
+    const {
+      page,
+      size,
+      sortBy,
+      search,
+      status,
+      startDate,
+      endDate,
+      organizationId,
+    } = data;
     const where: Prisma.PreparationWhereInput = {
       organizationId,
+      ...(status && { status }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
@@ -44,6 +54,18 @@ export class PreparationRepository {
         ],
       }),
     };
+    if (startDate || endDate) {
+      const preparedAt: { gte?: Date; lt?: Date } = {};
+      if (startDate) {
+        preparedAt.gte = startDate;
+      }
+      if (endDate) {
+        const endDateExclusive = new Date(endDate);
+        endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() + 1);
+        preparedAt.lt = endDateExclusive;
+      }
+      where.preparedAt = preparedAt;
+    }
     const skip = (page - 1) * size;
 
     const [items, total] = await this.prisma.$transaction([

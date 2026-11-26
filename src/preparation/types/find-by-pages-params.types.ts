@@ -1,3 +1,5 @@
-import { GetByPagesDto } from '../dto/get-by-pages.dto.js';
+import { GetPreparationByPagesDto } from '../dto/get-preparation-by-pages.dto.js';
 
-export type FindByPagesParams = GetByPagesDto & { organizationId: string };
+export type FindByPagesParams = GetPreparationByPagesDto & {
+  organizationId: string;
+};

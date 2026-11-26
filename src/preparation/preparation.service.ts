@@ -10,7 +10,7 @@ import {
   Prisma,
 } from '../../prisma/generated/prisma/client.js';
 import { CreatePreparationDto } from './dto/create-preparation.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetPreparationByPagesDto } from './dto/get-preparation-by-pages.dto.js';
 import { UpdatePreparationDto } from './dto/update-preparation.dto.js';
 import { PreparationRepository } from './preparation.repository.js';
 import { InventoryItemService } from '../inventory-item/inventory-item.service.js';
@@ -23,7 +23,10 @@ export class PreparationService {
     private readonly inventoryItemService: InventoryItemService,
   ) {}
 
-  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
+  async findByPages(
+    dto: GetPreparationByPagesDto,
+    userHeader: UserRequestHeader,
+  ) {
     const organizationId = this.requireOrganizationId(userHeader);
     const { items, total } = await this.preparationRepository.findByPages({
       ...dto,
