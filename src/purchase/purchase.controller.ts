@@ -21,8 +21,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
-import { PurchasesGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
+import { GetPurchaseByPagesDto } from './dto/get-purchase-by-pages.dto.js';
+import { GetPurchaseByPagesResponseDto } from './dto/get-purchase-by-pages-response.dto.js';
 import { CreatePurchaseDto } from './dto/create-purchase.dto.js';
 import { PurchaseResponseDto } from './dto/purchase-response.dto.js';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto.js';
@@ -42,10 +42,10 @@ export class PurchaseController {
     OrganizationUserRole.MEMBER,
   )
   @ApiOperation({ summary: 'Retrieve purchases by pages' })
-  @ApiOkResponse({ type: PurchasesGetByPagesResponseDto })
+  @ApiOkResponse({ type: GetPurchaseByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
-    @Query() query: GetByPagesDto,
+    @Query() query: GetPurchaseByPagesDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.purchaseService.findByPages(query, request.user);

@@ -7,7 +7,7 @@ import {
 } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
-import { FindByPagesParams } from './types/find-by-pages-params.types.js';
+import { PurchaseFindByPagesParams } from './types/purchase-find-by-pages-params.types.js';
 import { PurchaseItemChange } from './types/purchase-item-change.type.js';
 import { responseInclude } from './constants/response-include.constants.js';
 
@@ -15,11 +15,21 @@ import { responseInclude } from './constants/response-include.constants.js';
 export class PurchaseRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, search, organizationId } = data;
+  async findByPages(data: PurchaseFindByPagesParams) {
+    const {
+      page,
+      size,
+      sortBy,
+      search,
+      status,
+      startDate,
+      endDate,
+      organizationId,
+    } = data;
     const skip = (page - 1) * size;
     const where: Prisma.PurchaseWhereInput = {
       organizationId,
+      ...(status && { status }),
       ...(search && {
         OR: [
           { supplierName: { contains: search, mode: 'insensitive' } },
@@ -36,6 +46,19 @@ export class PurchaseRepository {
         ],
       }),
     };
+
+    if (startDate || endDate) {
+      const purchasedAt: { gte?: Date; lt?: Date } = {};
+      if (startDate) {
+        purchasedAt.gte = startDate;
+      }
+      if (endDate) {
+        const endDateExclusive = new Date(endDate);
+        endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() + 1);
+        purchasedAt.lt = endDateExclusive;
+      }
+      where.purchasedAt = purchasedAt;
+    }
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.purchase.findMany({

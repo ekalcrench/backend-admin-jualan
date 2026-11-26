@@ -11,7 +11,7 @@ import {
   PurchaseStatus,
 } from '../../prisma/generated/prisma/client.js';
 import { CreatePurchaseDto } from './dto/create-purchase.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetPurchaseByPagesDto } from './dto/get-purchase-by-pages.dto.js';
 import { UpdatePurchaseItemDto } from './dto/update-purchase-item.dto.js';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto.js';
 import { PurchaseRepository } from './purchase.repository.js';
@@ -22,7 +22,17 @@ import { UserRequestHeader } from '../common/types/user-request-header.types.js'
 export class PurchaseService {
   constructor(private readonly purchaseRepository: PurchaseRepository) {}
 
-  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
+  async findByPages(dto: GetPurchaseByPagesDto, userHeader: UserRequestHeader) {
+    if (
+      dto.startDate &&
+      dto.endDate &&
+      dto.startDate.getTime() > dto.endDate.getTime()
+    ) {
+      throw new BadRequestException(
+        'startDate must be before or equal to endDate',
+      );
+    }
+
     const organizationId = this.requireOrganizationId(userHeader);
     const { items, total } = await this.purchaseRepository.findByPages({
       ...dto,
