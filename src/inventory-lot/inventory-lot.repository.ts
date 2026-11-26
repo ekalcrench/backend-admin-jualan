@@ -89,7 +89,8 @@ export class InventoryLotRepository {
   }
 
   async findByPages(data: GetInventoryLotsByPagesDto, organizationId: string) {
-    const { page, size, sortBy, inventoryItemId, search } = data;
+    const { page, size, sortBy, inventoryItemId, search, startDate, endDate } =
+      data;
     const skip = (page - 1) * size;
     const where: Prisma.InventoryLotWhereInput = {
       inventoryItem: {
@@ -114,6 +115,19 @@ export class InventoryLotRepository {
         },
       }),
     };
+
+    if (startDate || endDate) {
+      const receivedAt: { gte?: Date; lt?: Date } = {};
+      if (startDate) {
+        receivedAt.gte = startDate;
+      }
+      if (endDate) {
+        const endDateExclusive = new Date(endDate);
+        endDateExclusive.setUTCDate(endDateExclusive.getUTCDate() + 1);
+        receivedAt.lt = endDateExclusive;
+      }
+      where.receivedAt = receivedAt;
+    }
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.inventoryLot.findMany({

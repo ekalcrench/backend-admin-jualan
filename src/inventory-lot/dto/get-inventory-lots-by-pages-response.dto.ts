@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { DefaultPaginationResponseDto } from '../../common/dto/default-pagination-response.dto.js';
 import { InventoryLotResponseDto } from './inventory-lot-response.dto.js';
 
-export class InventoryLotGetByPagesResponseDto {
+export class GetInventoryLotsByPagesResponseDto {
   @ApiProperty({ type: [InventoryLotResponseDto] })
   items!: InventoryLotResponseDto[];
 

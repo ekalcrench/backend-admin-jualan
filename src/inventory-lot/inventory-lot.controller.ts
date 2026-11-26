@@ -17,7 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
 import { GetInventoryLotsByPagesDto } from './dto/get-inventory-lots-by-pages.dto.js';
-import { InventoryLotGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
+import { GetInventoryLotsByPagesResponseDto } from './dto/get-inventory-lots-by-pages-response.dto.js';
 import { InventoryLotResponseDto } from './dto/inventory-lot-response.dto.js';
 import { UpdateInventoryLotDto } from './dto/update-inventory-lot.dto.js';
 import { InventoryLotService } from './inventory-lot.service.js';
@@ -36,7 +36,7 @@ export class InventoryLotController {
     OrganizationUserRole.MEMBER,
   )
   @ApiOperation({ summary: 'Retrieve inventory lots by pages' })
-  @ApiOkResponse({ type: InventoryLotGetByPagesResponseDto })
+  @ApiOkResponse({ type: GetInventoryLotsByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
     @Query() query: GetInventoryLotsByPagesDto,
