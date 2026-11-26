@@ -12,7 +12,7 @@ import {
 } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
-import type { FindByPagesParams } from './types/find-by-pages-params.types.js';
+import type { OrderFindByPagesParams } from './types/order-find-by-pages-params.types.js';
 import type { OrderItemChange } from './types/order-item-change.type.js';
 import { responseInclude } from './constants/response-include.constants.js';
 import { roundCost } from '../common/constants/round-cost.constants.js';
@@ -204,12 +204,23 @@ export class OrderRepository {
     );
   }
 
-  async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, search, startDate, endDate, organizationId } =
-      data;
+  async findByPages(data: OrderFindByPagesParams) {
+    const {
+      page,
+      size,
+      sortBy,
+      search,
+      startDate,
+      endDate,
+      status,
+      type,
+      organizationId,
+    } = data;
     const skip = (page - 1) * size;
     const where: Prisma.OrderWhereInput = {
       organizationId,
+      ...(status && { status }),
+      ...(type && { type }),
       ...(search && {
         OR: [
           { orderNumber: { contains: search, mode: 'insensitive' } },

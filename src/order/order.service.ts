@@ -12,7 +12,7 @@ import {
 } from '../../prisma/generated/prisma/client.js';
 import { OrderType } from '../../prisma/generated/prisma/enums.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetOrderByPagesDto } from './dto/get-order-by-pages.dto.js';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto.js';
 import { UpdateOrderDto } from './dto/update-order.dto.js';
 import {
@@ -26,7 +26,7 @@ import { OrderItemChange } from './types/order-item-change.type.js';
 import { ProductByIdRecord } from './types/product-by-id-record-types.js';
 import { OrderRecord } from './types/order-record.types.js';
 import { OrderResponseDto } from './dto/order-response.dto.js';
-import { GetOrderOverviewDto } from './dto/get-overview.dto.js';
+import { GetOrderOverviewDto } from './dto/get-order-overview.dto.js';
 import { UserRequestHeader } from '../common/types/user-request-header.types.js';
 import { CreateDeliveryOrderDto } from './dto/create-delivery-order.dto.js';
 import { UpdateDeliveryOrderDto } from './dto/update-delivery-order.dto.js';
@@ -168,7 +168,7 @@ export class OrderService {
     };
   }
 
-  async findByPages(dto: GetByPagesDto, userHeader: UserRequestHeader) {
+  async findByPages(dto: GetOrderByPagesDto, userHeader: UserRequestHeader) {
     if (
       dto.startDate &&
       dto.endDate &&

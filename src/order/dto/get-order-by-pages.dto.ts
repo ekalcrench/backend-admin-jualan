@@ -1,9 +1,23 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDate, IsOptional } from 'class-validator';
+import { IsDate, IsEnum, IsOptional } from 'class-validator';
+import {
+  OrderStatus,
+  OrderType,
+} from '../../../prisma/generated/prisma/enums.js';
 import { DefaultGetByPagesDto } from '../../common/dto/default-get-by-pages.dto.js';
 
-export class GetByPagesDto extends DefaultGetByPagesDto {
+export class GetOrderByPagesDto extends DefaultGetByPagesDto {
+  @ApiPropertyOptional({ enum: OrderStatus })
+  @IsEnum(OrderStatus)
+  @IsOptional()
+  status?: OrderStatus;
+
+  @ApiPropertyOptional({ enum: OrderType })
+  @IsEnum(OrderType)
+  @IsOptional()
+  type?: OrderType;
+
   @ApiPropertyOptional({
     type: String,
     format: 'date',

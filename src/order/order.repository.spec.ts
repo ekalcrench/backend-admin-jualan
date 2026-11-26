@@ -1041,3 +1041,41 @@ describe('OrderRepository manual product stock', () => {
     );
   });
 });
+
+describe('OrderRepository paginated order filters', () => {
+  it('applies status and type filters to both page results and total count', async () => {
+    const order = {
+      findMany: jest.fn<() => Promise<never[]>>().mockResolvedValue([]),
+      count: jest.fn<() => Promise<number>>().mockResolvedValue(0),
+    };
+    const prisma = {
+      order,
+      $transaction: jest.fn((queries: Promise<unknown>[]) =>
+        Promise.all(queries),
+      ),
+    };
+    const repository = new OrderRepository(
+      prisma as unknown as PrismaService,
+      {} as ProductModifierOrderingService,
+    );
+
+    await repository.findByPages({
+      page: 1,
+      size: 10,
+      sortBy: '-createdAt',
+      status: OrderStatus.UNPAID,
+      type: OrderType.TAKEAWAY,
+      organizationId,
+    });
+
+    const expectedWhere = {
+      organizationId,
+      status: OrderStatus.UNPAID,
+      type: OrderType.TAKEAWAY,
+    };
+    expect(order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expectedWhere }),
+    );
+    expect(order.count).toHaveBeenCalledWith({ where: expectedWhere });
+  });
+});

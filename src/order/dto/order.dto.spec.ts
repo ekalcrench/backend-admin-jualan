@@ -1,6 +1,11 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import {
+  OrderStatus,
+  OrderType,
+} from '../../../prisma/generated/prisma/enums.js';
 import { CreateOrderItemDto } from './create-order-item.dto.js';
+import { GetOrderByPagesDto } from './get-order-by-pages.dto.js';
 import { UpdateOrderItemDto } from './update-order-item.dto.js';
 
 const productId = '11111111-1111-4111-8111-111111111111';
@@ -67,5 +72,31 @@ describe('Order modifier DTO validation', () => {
     });
 
     expect(errors).toHaveLength(0);
+  });
+});
+
+describe('GetOrderByPagesDto validation', () => {
+  const requiredPageParams = { page: 1, size: 10, sortBy: '-createdAt' };
+
+  it('accepts valid order status and type filters', async () => {
+    const errors = await validatePayload(GetOrderByPagesDto, {
+      ...requiredPageParams,
+      status: OrderStatus.UNPAID,
+      type: OrderType.DINE_IN,
+    });
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects invalid order status and type filters', async () => {
+    const errors = await validatePayload(GetOrderByPagesDto, {
+      ...requiredPageParams,
+      status: 'INVALID',
+      type: 'INVALID',
+    });
+
+    expect(errors.map((error) => error.property)).toEqual(
+      expect.arrayContaining(['status', 'type']),
+    );
   });
 });

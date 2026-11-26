@@ -21,10 +21,10 @@ import {
 } from '@nestjs/swagger';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
-import { OrderGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
+import { GetOrderByPagesDto } from './dto/get-order-by-pages.dto.js';
+import { GetOrderByPagesResponseDto } from './dto/get-order-by-pages-response.dto.js';
 import { OrderResponseDto } from './dto/order-response.dto.js';
-import { GetOrderOverviewDto } from './dto/get-overview.dto.js';
+import { GetOrderOverviewDto } from './dto/get-order-overview.dto.js';
 import { OrderOverviewResponseDto } from './dto/order-overview-response.dto.js';
 import { OrderOverviewItemsResponseDto } from './dto/order-overview-items-response.dto.js';
 import { UpdateOrderDto } from './dto/update-order.dto.js';
@@ -40,10 +40,10 @@ export class OrderController {
   @Get()
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve orders by pages' })
-  @ApiOkResponse({ type: OrderGetByPagesResponseDto })
+  @ApiOkResponse({ type: GetOrderByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid date range' })
   findByPages(
-    @Query() query: GetByPagesDto,
+    @Query() query: GetOrderByPagesDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.orderService.findByPages(query, request.user);
