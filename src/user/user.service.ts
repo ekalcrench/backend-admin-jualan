@@ -8,7 +8,7 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as argon2 from 'argon2';
 import { UserResponseDto } from './dto/user-response.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetUserByPagesDto } from './dto/get-user-by-pages.dto.js';
 import { UserStatus } from '../common/enums/user-status.enum.js';
 
 @Injectable()
@@ -21,7 +21,7 @@ export class UserService {
     return safeUser;
   }
 
-  async findByPages(dto: GetByPagesDto) {
+  async findByPages(dto: GetUserByPagesDto) {
     const { items, total } = await this.userRepository.findByPages(dto);
 
     return {

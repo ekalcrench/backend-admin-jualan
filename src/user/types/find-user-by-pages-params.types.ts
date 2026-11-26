@@ -4,7 +4,7 @@ import {
 } from '../../../prisma/generated/prisma/enums.js';
 import { TableDefaultParams } from '../../common/types/table-default-params.types.js';
 
-export type FindByPagesParams = TableDefaultParams & {
+export type FindUserByPagesParams = TableDefaultParams & {
   role?: UserRole;
   status?: UserStatus;
 };

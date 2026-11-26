@@ -23,8 +23,8 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { UserRole } from '../common/enums/user-role.enum.js';
-import { UserGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetUserByPagesResponseDto } from './dto/get-user-by-pages-response.dto.js';
+import { GetUserByPagesDto } from './dto/get-user-by-pages.dto.js';
 import { UserOrganizationResponseDto } from './dto/user-organization-response.dto.js';
 import { GetUserOptionsDto } from './dto/get-user-options.dto.js';
 import { UserOptionResponseDto } from './dto/user-option-response.dto.js';
@@ -37,9 +37,9 @@ export class UserController {
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @ApiOperation({ summary: 'Retrieve organizations by pages' })
-  @ApiOkResponse({ type: UserGetByPagesResponseDto })
+  @ApiOkResponse({ type: GetUserByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
-  findByPages(@Query() query: GetByPagesDto) {
+  findByPages(@Query() query: GetUserByPagesDto) {
     return this.userService.findByPages(query);
   }
 

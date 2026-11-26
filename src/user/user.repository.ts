@@ -1,7 +1,7 @@
 import { Prisma } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Injectable } from '@nestjs/common';
-import { FindByPagesParams } from './types/find-by-pages-params.types.js';
+import { FindUserByPagesParams } from './types/find-user-by-pages-params.types.js';
 import { sortMap } from './constants/sort.map.constants.js';
 
 @Injectable()
@@ -30,31 +30,31 @@ export class UserRepository {
     });
   }
 
-  async findByPages(data: FindByPagesParams) {
+  async findByPages(data: FindUserByPagesParams) {
     const { page, size, sortBy, search, role, status } = data;
 
     const skip = (page - 1) * size;
 
-    const where: Prisma.UserWhereInput = search
-      ? {
-          OR: [
-            {
-              name: {
-                contains: search,
-                mode: 'insensitive',
-              },
+    const where: Prisma.UserWhereInput = {
+      ...(role && { role }),
+      ...(status && { status }),
+      ...(search && {
+        OR: [
+          {
+            name: {
+              contains: search,
+              mode: 'insensitive',
             },
-            {
-              email: {
-                contains: search,
-                mode: 'insensitive',
-              },
+          },
+          {
+            email: {
+              contains: search,
+              mode: 'insensitive',
             },
-          ],
-          ...(role && { role }),
-          ...(status && { status }),
-        }
-      : {};
+          },
+        ],
+      }),
+    };
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({

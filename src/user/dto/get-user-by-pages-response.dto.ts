@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { DefaultPaginationResponseDto } from '../../common/dto/default-pagination-response.dto.js';
 import { UserResponseDto } from './user-response.dto.js';
 
-export class UserGetByPagesResponseDto {
+export class GetUserByPagesResponseDto {
   @ApiProperty({ type: [UserResponseDto] })
   items!: UserResponseDto[];
 
