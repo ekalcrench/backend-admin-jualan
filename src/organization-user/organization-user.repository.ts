@@ -1,7 +1,7 @@
 import { Prisma } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Injectable } from '@nestjs/common';
-import { FindByPagesParams } from './types/find-by-pages-params.types.js';
+import { FindOrganizationUserByPagesParams } from './types/find-by-pages-params.types.js';
 import { sortMap } from './constants/sort.map.constants.js';
 import { organizationUserResponseInclude } from './constants/response-include.constants.js';
 
@@ -13,13 +13,15 @@ export class OrganizationUserRepository {
     return this.prisma.user.findMany();
   }
 
-  async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, search, organizationId } = data;
+  async findByPages(data: FindOrganizationUserByPagesParams) {
+    const { page, size, sortBy, search, organizationId, role, status } = data;
 
     const skip = (page - 1) * size;
 
     const where: Prisma.OrganizationUserWhereInput = {
       organizationId,
+      ...(role && { role }),
+      ...(status && { status }),
       ...(search && {
         user: {
           OR: [

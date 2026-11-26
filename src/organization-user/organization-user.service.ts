@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { CreateOrganizationUserDto } from './dto/create-organization-user.dto.js';
 import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetOrganizationUserByPagesDto } from './dto/get-organization-user-by-pages.dto.js';
 import { OrganizationUserRepository } from './organization-user.repository.js';
 import { OrganizationUserStatus } from '../../prisma/generated/prisma/enums.js';
 import { OrganizationUserResponseDto } from './dto/organization-user-response.dto.js';
@@ -43,7 +43,7 @@ export class OrganizationUserService {
   }
 
   async findByPages(
-    dto: GetByPagesDto,
+    dto: GetOrganizationUserByPagesDto,
     jwtPayload: { organizationId?: string },
   ) {
     const { organizationId } = jwtPayload;
@@ -78,10 +78,7 @@ export class OrganizationUserService {
     return this.toResponse(user);
   }
 
-  async create(
-    dto: CreateOrganizationUserDto,
-    jwtPayload: UserRequestHeader,
-  ) {
+  async create(dto: CreateOrganizationUserDto, jwtPayload: UserRequestHeader) {
     const { organizationId } = jwtPayload;
 
     if (!organizationId) {

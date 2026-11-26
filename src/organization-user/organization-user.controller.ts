@@ -26,8 +26,8 @@ import { UpdateOrganizationUserDto } from './dto/update-organization-user.dto.js
 import { OrganizationUserResponseDto } from './dto/organization-user-response.dto.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { UserRole } from '../common/enums/user-role.enum.js';
-import { OrganizationUserGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetOrganizationUserByPagesResponseDto } from './dto/get-organization-user-by-pages-response.dto.js';
+import { GetOrganizationUserByPagesDto } from './dto/get-organization-user-by-pages.dto.js';
 import type { Request } from 'express';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
 import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
@@ -43,10 +43,10 @@ export class OrganizationUserController {
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER)
   @ApiOperation({ summary: 'Retrieve organizations by pages' })
-  @ApiOkResponse({ type: OrganizationUserGetByPagesResponseDto })
+  @ApiOkResponse({ type: GetOrganizationUserByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
-    @Query() query: GetByPagesDto,
+    @Query() query: GetOrganizationUserByPagesDto,
     @Req() request: Request & { user: { organizationId?: string } },
   ) {
     return this.organizationUserService.findByPages(query, request.user);
@@ -97,10 +97,7 @@ export class OrganizationUserController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiNotFoundResponse({ description: 'User not found' })
   @HttpCode(HttpStatus.OK)
-  suspend(
-    @Param('id') id: string,
-    @Req() request: AuthenticatedRequest,
-  ) {
+  suspend(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.organizationUserService.suspend(id, request.user);
   }
 
@@ -111,10 +108,7 @@ export class OrganizationUserController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiNotFoundResponse({ description: 'User not found' })
   @HttpCode(HttpStatus.OK)
-  activate(
-    @Param('id') id: string,
-    @Req() request: AuthenticatedRequest,
-  ) {
+  activate(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.organizationUserService.activate(id, request.user);
   }
 
@@ -125,10 +119,7 @@ export class OrganizationUserController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiNotFoundResponse({ description: 'User not found' })
   @HttpCode(HttpStatus.OK)
-  approve(
-    @Param('id') id: string,
-    @Req() request: AuthenticatedRequest,
-  ) {
+  approve(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return this.organizationUserService.approve(id, request.user);
   }
 }
