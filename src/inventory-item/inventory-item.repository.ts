@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../prisma/generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { sortMap } from './constants/sort-map.constants.js';
-import { FindByPagesParams } from './types/find-by-pages-params.types.js';
+import { FindInventoryItemByPagesParams } from './types/find-by-pages-params.types.js';
 import { itemWithLots } from './constants/response-include.constants.js';
 import { inventoryItemAggregateSort } from './constants/aggregator-sort.constants.js';
 
@@ -10,8 +10,8 @@ import { inventoryItemAggregateSort } from './constants/aggregator-sort.constant
 export class InventoryItemRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findByPages(data: FindByPagesParams) {
-    const { page, size, sortBy, search, organizationId } = data;
+  async findByPages(data: FindInventoryItemByPagesParams) {
+    const { page, size, sortBy, search, unit, organizationId } = data;
     const skip = (page - 1) * size;
     const aggregateSort = this.getAggregateSort(sortBy);
     const where: Prisma.InventoryItemWhereInput = {
@@ -23,6 +23,7 @@ export class InventoryItemRepository {
           mode: 'insensitive',
         },
       }),
+      ...(unit && { unit }),
     };
 
     if (aggregateSort) {
@@ -30,6 +31,7 @@ export class InventoryItemRepository {
         size,
         skip,
         search,
+        unit,
         organizationId,
         where,
         aggregateSort,
@@ -54,6 +56,7 @@ export class InventoryItemRepository {
     size,
     skip,
     search,
+    unit,
     organizationId,
     where,
     aggregateSort,
@@ -61,6 +64,7 @@ export class InventoryItemRepository {
     size: number;
     skip: number;
     search?: string;
+    unit?: FindInventoryItemByPagesParams['unit'];
     organizationId: string;
     where: Prisma.InventoryItemWhereInput;
     aggregateSort: {
@@ -82,6 +86,7 @@ export class InventoryItemRepository {
                 ? Prisma.sql`AND POSITION(LOWER(${search}) IN LOWER(item.name)) > 0`
                 : Prisma.empty
             }
+            ${unit ? Prisma.sql`AND item.unit = ${unit}` : Prisma.empty}
           GROUP BY item.id
           ORDER BY ${aggregateSort.expression} ${Prisma.raw(aggregateSort.direction)}, item.id ASC
           LIMIT ${size}

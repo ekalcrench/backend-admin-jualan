@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
+import { GetInventoryItemByPagesDto } from './dto/get-inventory-item-by-pages.dto.js';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
 import { InventoryItemAssetsResponseDto } from './dto/inventory-item-assets-response.dto.js';
 import { InventoryItemRepository } from './inventory-item.repository.js';
@@ -18,7 +18,10 @@ export class InventoryItemService {
     private readonly inventoryItemRepository: InventoryItemRepository,
   ) {}
 
-  async findByPages(dto: GetByPagesDto, context: UserRequestHeader) {
+  async findByPages(
+    dto: GetInventoryItemByPagesDto,
+    context: UserRequestHeader,
+  ) {
     const organizationId = this.requireOrganizationId(context);
     const { items, total } = await this.inventoryItemRepository.findByPages({
       ...dto,

@@ -19,11 +19,10 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
 import { OrganizationRoles } from '../auth/decorators/organization-roles.decorator.js';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto.js';
-import { GetByPagesDto } from './dto/get-by-pages.dto.js';
-import { InventoryItemGetByPagesResponseDto } from './dto/get-by-pages-response.dto.js';
+import { GetInventoryItemByPagesDto } from './dto/get-inventory-item-by-pages.dto.js';
+import { GetInventoryItemByPagesResponseDto } from './dto/get-inventory-item-by-pages-response.dto.js';
 import { InventoryItemResponseDto } from './dto/inventory-item-response.dto.js';
 import { InventoryItemAssetsResponseDto } from './dto/inventory-item-assets-response.dto.js';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
@@ -44,10 +43,10 @@ export class InventoryItemController {
     OrganizationUserRole.MEMBER,
   )
   @ApiOperation({ summary: 'Retrieve inventory items by pages' })
-  @ApiOkResponse({ type: InventoryItemGetByPagesResponseDto })
+  @ApiOkResponse({ type: GetInventoryItemByPagesResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   findByPages(
-    @Query() query: GetByPagesDto,
+    @Query() query: GetInventoryItemByPagesDto,
     @Req() request: AuthenticatedRequest,
   ) {
     return this.inventoryItemService.findByPages(query, request.user);

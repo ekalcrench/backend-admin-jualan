@@ -1,5 +1,5 @@
-import { GetByPagesDto } from '../dto/get-by-pages.dto.js';
+import { GetInventoryItemByPagesDto } from '../dto/get-inventory-item-by-pages.dto.js';
 
-export type FindByPagesParams = GetByPagesDto & {
+export type FindInventoryItemByPagesParams = GetInventoryItemByPagesDto & {
   organizationId: string;
 };
