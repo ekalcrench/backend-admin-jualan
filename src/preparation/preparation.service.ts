@@ -78,10 +78,6 @@ export class PreparationService {
       },
       dto.preparationItems,
     );
-    if (preparation === 'insufficient-stock') {
-      throw new ConflictException('Stock bahan tidak mencukupi');
-    }
-
     return this.toResponse(preparation);
   }
 
@@ -168,7 +164,9 @@ export class PreparationService {
       throw new ConflictException('Only draft preparations can be completed');
     }
     if (preparation === 'insufficient-stock') {
-      throw new ConflictException('Stock bahan tidak mencukupi');
+      throw new ConflictException(
+        'Ada stok yang tidak cukup, cek kembali form Anda',
+      );
     }
     if (preparation === 'related-record-not-found') {
       throw new NotFoundException(

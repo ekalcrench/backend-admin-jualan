@@ -101,14 +101,11 @@ export class PreparationRepository {
   ) {
     return this.prisma.$transaction(
       async (transaction) => {
-        const plannedPreparation = await this.planItems(transaction, items);
-        if (!plannedPreparation) {
-          return 'insufficient-stock' as const;
-        }
-
-        await this.decreaseLotQuantities(
+        const plannedPreparation = await this.planItems(
           transaction,
-          plannedPreparation.inventoryTransactions,
+          items,
+          [],
+          true,
         );
         const costs = this.calculateOutputCosts(
           plannedPreparation.items,
@@ -132,12 +129,6 @@ export class PreparationRepository {
           transaction,
           preparation.id,
           plannedPreparation.items,
-        );
-        await this.createPreparationOutTransactions(
-          transaction,
-          organizationId,
-          preparation.id,
-          plannedPreparation.inventoryTransactions,
         );
         return transaction.preparation.findFirstOrThrow({
           where: { id: preparation.id, organizationId },
@@ -256,7 +247,7 @@ export class PreparationRepository {
             },
           });
         let plannedPreparation: PlannedPreparation | undefined;
-        if (hasItemChanges) {
+        if (hasItemChanges || isCompleting) {
           const changedById = new Map(
             changes
               .filter(
@@ -295,16 +286,28 @@ export class PreparationRepository {
             return 'empty-preparation' as const;
           }
 
-          plannedPreparation = await this.planItems(
-            transaction,
-            mergedItems,
-            preparationOutTransactions.map((transaction) => ({
-              inventoryLotId: transaction.inventoryLotId,
-              quantity: transaction.quantity,
-            })),
-          );
-          if (!plannedPreparation) {
-            return 'insufficient-stock' as const;
+          if (isCompleting) {
+            plannedPreparation = await this.planItems(
+              transaction,
+              mergedItems,
+              preparationOutTransactions.map((transaction) => ({
+                inventoryLotId: transaction.inventoryLotId,
+                quantity: transaction.quantity,
+              })),
+            );
+            if (!plannedPreparation) {
+              return 'insufficient-stock' as const;
+            }
+          } else {
+            plannedPreparation = await this.planItems(
+              transaction,
+              mergedItems,
+              preparationOutTransactions.map((transaction) => ({
+                inventoryLotId: transaction.inventoryLotId,
+                quantity: transaction.quantity,
+              })),
+              true,
+            );
           }
 
           for (const inventoryTransaction of preparationOutTransactions) {
@@ -327,21 +330,41 @@ export class PreparationRepository {
               type: InventoryTransactionType.PREPARATION_OUT,
             },
           });
-          await this.decreaseLotQuantities(
-            transaction,
-            plannedPreparation.inventoryTransactions,
-          );
           await this.createPreparationItems(
             transaction,
             id,
             plannedPreparation.items,
           );
-          await this.createPreparationOutTransactions(
-            transaction,
-            organizationId,
-            id,
-            plannedPreparation.inventoryTransactions,
-          );
+          if (isCompleting) {
+            await this.decreaseLotQuantities(
+              transaction,
+              plannedPreparation.inventoryTransactions,
+            );
+            await this.createPreparationOutTransactions(
+              transaction,
+              organizationId,
+              id,
+              plannedPreparation.inventoryTransactions,
+            );
+          }
+        } else if (preparationOutTransactions.length) {
+          for (const inventoryTransaction of preparationOutTransactions) {
+            await transaction.inventoryLot.update({
+              where: { id: inventoryTransaction.inventoryLotId },
+              data: {
+                remainingQuantity: {
+                  increment: inventoryTransaction.quantity,
+                },
+              },
+            });
+          }
+          await transaction.inventoryTransaction.deleteMany({
+            where: {
+              organizationId,
+              referenceId: id,
+              type: InventoryTransactionType.PREPARATION_OUT,
+            },
+          });
         }
 
         const effectiveItems =
@@ -515,6 +538,24 @@ export class PreparationRepository {
     );
   }
 
+  private planItems(
+    transaction: Prisma.TransactionClient,
+    items: PreparationItemInput[],
+    quantitiesToRestore: Array<{
+      inventoryLotId: string;
+      quantity: Prisma.Decimal;
+    }>,
+    allowInsufficientStock: true,
+  ): Promise<PlannedPreparation>;
+  private planItems(
+    transaction: Prisma.TransactionClient,
+    items: PreparationItemInput[],
+    quantitiesToRestore?: Array<{
+      inventoryLotId: string;
+      quantity: Prisma.Decimal;
+    }>,
+    allowInsufficientStock?: false,
+  ): Promise<PlannedPreparation | undefined>;
   private async planItems(
     transaction: Prisma.TransactionClient,
     items: PreparationItemInput[],
@@ -522,6 +563,7 @@ export class PreparationRepository {
       inventoryLotId: string;
       quantity: Prisma.Decimal;
     }> = [],
+    allowInsufficientStock = false,
   ): Promise<PlannedPreparation | undefined> {
     const inventoryItemIds = [
       ...new Set(items.map((item) => item.inventoryItemId)),
@@ -585,7 +627,16 @@ export class PreparationRepository {
       }
 
       if (!quantityNeeded.equals(0)) {
-        return undefined;
+        if (!allowInsufficientStock) {
+          return undefined;
+        }
+
+        const fallbackLot = itemLots[itemLots.length - 1];
+        if (fallbackLot) {
+          weightedCost = weightedCost.plus(
+            fallbackLot.unitCost.mul(quantityNeeded),
+          );
+        }
       }
 
       const unitCost = roundCost(weightedCost.div(quantity), 3);

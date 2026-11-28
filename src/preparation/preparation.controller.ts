@@ -59,14 +59,10 @@ export class PreparationController {
   @Post()
   @OrganizationRoles(OrganizationUserRole.OWNER, OrganizationUserRole.ADMIN)
   @ApiOperation({
-    summary: 'Create a draft preparation and reserve its ingredient inventory',
+    summary: 'Create a draft preparation',
   })
   @ApiCreatedResponse({ type: PreparationResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
-  @ApiConflictResponse({
-    description:
-      'There is not enough remaining inventory to complete preparation',
-  })
   @ApiNotFoundResponse({
     description: 'One or more inventory items were not found',
   })
@@ -88,7 +84,7 @@ export class PreparationController {
   @ApiBadRequestResponse({ description: 'Invalid request payload' })
   @ApiConflictResponse({
     description:
-      'Insufficient inventory, the preparation output has already been consumed, or the preparation is completed',
+      'The preparation output has already been consumed, or the preparation is completed',
   })
   @ApiNotFoundResponse({
     description: 'Preparation or one of its related records was not found',
