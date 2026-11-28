@@ -58,6 +58,30 @@ export class InventoryItemService {
     );
   }
 
+  async findOptionsWithStock(context: UserRequestHeader) {
+    const items = await this.inventoryItemRepository.findOptions(
+      this.requireOrganizationId(context),
+    );
+    const inventoryLots =
+      await this.inventoryItemRepository.findRemainingStockByInventoryItemIds(
+        items.map((item) => item.id),
+      );
+    const stockByInventoryItemId = new Map<string, number>(
+      inventoryLots.map(
+        (lot) =>
+          [
+            lot.inventoryItemId,
+            lot._sum.remainingQuantity?.toNumber() ?? 0,
+          ] as const,
+      ),
+    );
+
+    return items.map((item) => ({
+      ...item,
+      stock: stockByInventoryItemId.get(item.id) ?? 0,
+    }));
+  }
+
   async getAssets(
     context: UserRequestHeader,
   ): Promise<InventoryItemAssetsResponseDto> {

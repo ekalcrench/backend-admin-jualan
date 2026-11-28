@@ -167,6 +167,18 @@ export class InventoryItemRepository {
     });
   }
 
+  findRemainingStockByInventoryItemIds(ids: string[]) {
+    if (!ids.length) {
+      return [];
+    }
+
+    return this.prisma.inventoryLot.groupBy({
+      by: ['inventoryItemId'],
+      where: { inventoryItemId: { in: ids } },
+      _sum: { remainingQuantity: true },
+    });
+  }
+
   async getAssets(organizationId: string) {
     const [result] = await this.prisma.$queryRaw<
       Array<{ totalAssets: Prisma.Decimal }>

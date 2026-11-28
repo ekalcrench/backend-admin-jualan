@@ -28,6 +28,7 @@ import { InventoryItemAssetsResponseDto } from './dto/inventory-item-assets-resp
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto.js';
 import { InventoryItemService } from './inventory-item.service.js';
 import { InventoryItemOptionsResponseDto } from './dto/inventory-item-options-response.dto.js';
+import { InventoryItemOptionsWithStockResponseDto } from './dto/inventory-item-options-with-stock-response.dto.js';
 import { OrganizationUserRole } from '../../prisma/generated/prisma/enums.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.types.js';
 
@@ -62,6 +63,21 @@ export class InventoryItemController {
   @ApiOkResponse({ type: InventoryItemOptionsResponseDto, isArray: true })
   findOptions(@Req() request: AuthenticatedRequest) {
     return this.inventoryItemService.findOptions(request.user);
+  }
+
+  @Get('options/with-stock')
+  @OrganizationRoles(
+    OrganizationUserRole.OWNER,
+    OrganizationUserRole.ADMIN,
+    OrganizationUserRole.MEMBER,
+  )
+  @ApiOperation({ summary: 'Retrieve all inventory items options with stock' })
+  @ApiOkResponse({
+    type: InventoryItemOptionsWithStockResponseDto,
+    isArray: true,
+  })
+  findOptionsWithStock(@Req() request: AuthenticatedRequest) {
+    return this.inventoryItemService.findOptionsWithStock(request.user);
   }
 
   @Get('assets')
